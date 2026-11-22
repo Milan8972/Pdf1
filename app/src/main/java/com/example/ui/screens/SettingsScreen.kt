@@ -25,19 +25,14 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Translate
-import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -54,16 +49,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.UserSettings
 import com.example.ui.theme.AccentPreset
-import com.example.ui.theme.BrandAmber
-import com.example.ui.theme.BrandCoral
 import com.example.ui.theme.LocalPaperPilotColors
 import com.example.ui.theme.ThemeMode
 import kotlin.math.roundToInt
@@ -74,19 +65,14 @@ fun SettingsScreen(
     settings: UserSettings,
     onSetThemeMode: (ThemeMode) -> Unit,
     onSetAccentPreset: (AccentPreset) -> Unit,
-    onSetAskMobileData: (Boolean) -> Unit,
     onSetDefaultSaveFolder: (String) -> Unit,
     onSetOcrLanguage: (String) -> Unit,
     onSetDefaultImageQuality: (Int) -> Unit,
     onSetKeepOriginalFiles: (Boolean) -> Unit,
-    onSaveLocalProfile: (String, String) -> Unit,
-    onTogglePro: (Boolean) -> Unit,
     onReplayOnboarding: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val extra = LocalPaperPilotColors.current
-    var showProfileDialog by remember { mutableStateOf(false) }
-    var showPlanSheet by remember { mutableStateOf(false) }
     var showOcrLangDialog by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
     var infoModal by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -102,84 +88,6 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
-        }
-
-        // Local Profile Card (optional, no login required)
-        item {
-            Surface(
-                onClick = { showProfileDialog = true },
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, extra.subtleBorder),
-                modifier = Modifier.fillMaxWidth().testTag("settings_profile_card")
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(BrandCoral, BrandAmber)))
-                    ) {
-                        Icon(Icons.Rounded.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(settings.profileName, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = settings.profileEmail.ifBlank { "Optional local profile • No login required" },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = extra.mutedText
-                        )
-                    }
-                    TextButton(onClick = { showProfileDialog = true }) {
-                        Text(if (settings.profileEmail.isBlank()) "Sign in" else "Edit")
-                    }
-                }
-            }
-        }
-
-        // Free vs Pro Plan Card
-        item {
-            Surface(
-                onClick = { showPlanSheet = true },
-                shape = RoundedCornerShape(20.dp),
-                color = if (settings.isPro) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, if (settings.isPro) MaterialTheme.colorScheme.tertiary else BrandAmber.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth().testTag("settings_plan_card")
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(BrandAmber.copy(alpha = 0.2f))
-                    ) {
-                        Icon(Icons.Rounded.WorkspacePremium, null, tint = BrandAmber, modifier = Modifier.size(26.dp))
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (settings.isPro) "paperpilot Pro Active (Demo)" else "Upgrade to paperpilot Pro",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = if (settings.isPro) "Unlimited OCR & heavy tools unlocked locally"
-                            else "Compare Free vs Pro • Unlock unlimited heavy tools",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = extra.mutedText
-                        )
-                    }
-                    Icon(Icons.Rounded.ChevronRight, null)
-                }
-            }
         }
 
         // Appearance
@@ -234,12 +142,6 @@ fun SettingsScreen(
             SettingsGroup(title = "Preferences") {
                 Column {
                     SettingsToggleRow(
-                        title = "Ask before using mobile data",
-                        subtitle = "Confirm before any external link or share action on cellular",
-                        checked = settings.askMobileData,
-                        onCheckedChange = onSetAskMobileData
-                    )
-                    SettingsToggleRow(
                         title = "Keep original files",
                         subtitle = "Always export processed or edited PDFs as new copies",
                         checked = settings.keepOriginalFiles,
@@ -280,7 +182,7 @@ fun SettingsScreen(
                         infoModal = "Terms of Service" to "paperpilot processes your documents locally on your Android device. You retain full ownership and responsibility for all files created, merged, signed, or shared."
                     }
                     SettingsClickRow(Icons.Rounded.PrivacyTip, "Privacy policy", "100% On-device") {
-                        infoModal = "Privacy Policy" to "Private by design: paperpilot never uploads your PDFs, scanned images, or signatures to any external server. All processing, thumbnails, and settings stay strictly inside your device storage."
+                        infoModal = "Privacy Policy" to "Private by design: paperpilot requires no account and never uploads your PDFs, scanned images, or signatures to any server. All document processing, thumbnails, and settings stay strictly on your device."
                     }
                     SettingsClickRow(Icons.Rounded.HelpOutline, "Help & Contact", "") {
                         infoModal = "Help & Support" to "Need assistance with paperpilot?\n\n• Every tool follows: Pick files → Options → Process → Save/Share.\n• Protected PDFs store a local SHA-256 lock.\n• Re-run the quick tour anytime below."
@@ -302,95 +204,6 @@ fun SettingsScreen(
             }
         }
         item { Spacer(Modifier.height(16.dp)) }
-    }
-
-    // Optional local profile / mock sign-in dialog
-    if (showProfileDialog) {
-        var name by remember { mutableStateOf(settings.profileName) }
-        var email by remember { mutableStateOf(settings.profileEmail) }
-        AlertDialog(
-            onDismissRequest = { showProfileDialog = false },
-            title = { Text("Local Profile (Optional)") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "No account is required to use paperpilot. Enter an optional display name and email stored strictly on this device for signature labels and forms.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = extra.mutedText
-                    )
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Display name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("Email (optional, local only)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    onSaveLocalProfile(name, email)
-                    showProfileDialog = false
-                }) { Text("Save locally") }
-            },
-            dismissButton = { TextButton(onClick = { showProfileDialog = false }) { Text("Cancel") } }
-        )
-    }
-
-    // Free vs Pro comparison sheet
-    if (showPlanSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showPlanSheet = false },
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-        ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)
-            ) {
-                Text("Free vs Pro", style = MaterialTheme.typography.headlineMedium)
-                Text(
-                    "All processing runs privately on your device. Demo toggle below simulates Pro unlocks with zero payments.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = extra.mutedText
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    PlanColumnCard(
-                        title = "Free",
-                        price = "$0",
-                        bullets = listOf("All core PDF tools", "Unlimited viewer & scanner", "2 OCR runs / day", "Local privacy"),
-                        highlighted = !settings.isPro,
-                        modifier = Modifier.weight(1f)
-                    )
-                    PlanColumnCard(
-                        title = "Pro",
-                        price = "Demo",
-                        bullets = listOf("Unlimited OCR runs", "Batch heavy tools", "Priority compression", "Zero lock badges"),
-                        highlighted = settings.isPro,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                if (settings.isPro) {
-                    OutlinedButton(
-                        onClick = { onTogglePro(false); showPlanSheet = false },
-                        shape = CircleShape,
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
-                    ) { Text("Switch back to Free") }
-                } else {
-                    Button(
-                        onClick = { onTogglePro(true); showPlanSheet = false },
-                        shape = CircleShape,
-                        modifier = Modifier.fillMaxWidth().height(50.dp).testTag("settings_mock_upgrade_button")
-                    ) { Text("Unlock Pro (Mock Upgrade — No Charge)") }
-                }
-            }
-        }
     }
 
     if (showOcrLangDialog) {
@@ -522,30 +335,5 @@ private fun SettingsClickRow(
             Spacer(Modifier.width(4.dp))
         }
         Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun PlanColumnCard(
-    title: String,
-    price: String,
-    bullets: List<String>,
-    highlighted: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = if (highlighted) MaterialTheme.colorScheme.primaryContainer.copy(0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(0.4f),
-        border = BorderStroke(1.5.dp, if (highlighted) MaterialTheme.colorScheme.primary else LocalPaperPilotColors.current.subtleBorder),
-        modifier = modifier
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(14.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(price, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(4.dp))
-            bullets.forEach { b ->
-                Text("• $b", style = MaterialTheme.typography.bodySmall)
-            }
-        }
     }
 }

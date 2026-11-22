@@ -40,7 +40,6 @@ import com.example.ui.components.ToolTile
 @Composable
 fun ToolsScreen(
     columnsCount: Int,
-    isProUnlocked: Boolean,
     onSelectTool: (ToolId) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -118,7 +117,6 @@ fun ToolsScreen(
                                         rowTools.forEach { tool ->
                                             ToolTile(
                                                 tool = tool,
-                                                isProUnlocked = isProUnlocked,
                                                 onClick = { onSelectTool(tool) },
                                                 modifier = Modifier.weight(1f)
                                             )

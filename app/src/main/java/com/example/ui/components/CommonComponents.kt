@@ -90,7 +90,6 @@ import java.util.Locale
 @Composable
 fun ToolTile(
     tool: ToolId,
-    isProUnlocked: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -117,20 +116,6 @@ fun ToolTile(
             .testTag("tool_tile_${tool.name.lowercase()}")
     ) {
         Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 14.dp)) {
-            if (tool.isProTool && !isProUnlocked) {
-                Surface(
-                    shape = CircleShape,
-                    color = BrandAmber.copy(alpha = 0.22f),
-                    modifier = Modifier.align(Alignment.TopEnd)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Lock,
-                        contentDescription = "Pro tool",
-                        tint = BrandAmber,
-                        modifier = Modifier.padding(4.dp).size(12.dp)
-                    )
-                }
-            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),

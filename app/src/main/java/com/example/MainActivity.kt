@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +53,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ads.AdMobBannerBar
+import com.example.ads.AdMobManager
+import com.example.ads.findActivity
 import com.example.data.DocumentEntity
 import com.example.data.DocumentSource
 import com.example.model.ToolId
@@ -73,13 +77,33 @@ import com.example.ui.theme.PaperPilotTheme
 import com.example.viewmodel.AppDestination
 import com.example.viewmodel.MainTab
 import com.example.viewmodel.PaperPilotViewModel
+import com.google.android.gms.ads.MobileAds
 
 class MainActivity : ComponentActivity() {
+    private var wentToBackground = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AdMobManager.configureTestDevices()
+        MobileAds.initialize(this) {
+            AdMobManager.onMobileAdsInitialized(this)
+        }
         enableEdgeToEdge()
         setContent {
             PaperPilotApp()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        wentToBackground = true
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (wentToBackground) {
+            wentToBackground = false
+            AdMobManager.showAppOpenIfAvailable(this)
         }
     }
 }
@@ -170,8 +194,10 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
                             defaultOcrLang = settings.ocrLanguage,
                             onBack = { viewModel.navigateBack() },
                             onPdfCreated = { created ->
-                                viewModel.popToMainTabs(MainTab.SCAN)
-                                viewModel.openDocument(created, bypassPassword = true)
+                                AdMobManager.showInterstitialIfReady(context.findActivity()) {
+                                    viewModel.popToMainTabs(MainTab.SCAN)
+                                    viewModel.openDocument(created, bypassPassword = true)
+                                }
                             }
                         )
                     }
@@ -221,8 +247,10 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
                                 viewModel = viewModel,
                                 onBack = { viewModel.navigateBack() },
                                 onSavedDocument = { saved ->
-                                    viewModel.popToMainTabs(MainTab.FILES)
-                                    viewModel.openDocument(saved, bypassPassword = true)
+                                    AdMobManager.showInterstitialIfReady(context.findActivity()) {
+                                        viewModel.popToMainTabs(MainTab.FILES)
+                                        viewModel.openDocument(saved, bypassPassword = true)
+                                    }
                                 }
                             )
                         } else {
@@ -241,7 +269,6 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
                                 MainTab.HOME -> HomeScreen(
                                     documents = documents,
                                     quickTools = viewModel.getQuickTools(),
-                                    isPro = settings.isPro,
                                     isLoading = isLoading,
                                     onOpenDocument = { viewModel.openDocument(it) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
@@ -278,7 +305,6 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
 
                                 MainTab.TOOLS -> ToolsScreen(
                                     columnsCount = toolColumns,
-                                    isProUnlocked = settings.isPro,
                                     onSelectTool = { viewModel.openTool(it) },
                                     modifier = contentModifier
                                 )
@@ -298,13 +324,10 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
                                     settings = settings,
                                     onSetThemeMode = viewModel::setThemeMode,
                                     onSetAccentPreset = viewModel::setAccentPreset,
-                                    onSetAskMobileData = viewModel::setAskMobileData,
                                     onSetDefaultSaveFolder = viewModel::setDefaultSaveFolder,
                                     onSetOcrLanguage = viewModel::setOcrLanguage,
                                     onSetDefaultImageQuality = viewModel::setDefaultImageQuality,
                                     onSetKeepOriginalFiles = viewModel::setKeepOriginalFiles,
-                                    onSaveLocalProfile = viewModel::setLocalProfile,
-                                    onTogglePro = viewModel::setProEnabled,
                                     onReplayOnboarding = { viewModel.navigateTo(AppDestination.Onboarding) },
                                     modifier = contentModifier
                                 )
@@ -373,7 +396,10 @@ private fun MainTabsScaffold(
                         )
                     }
                 }
-                content(Modifier.weight(1f).fillMaxSize())
+                Column(modifier = Modifier.weight(1f).fillMaxSize()) {
+                    content(Modifier.weight(1f).fillMaxSize())
+                    AdMobBannerBar()
+                }
             }
         }
     } else {
@@ -381,25 +407,28 @@ private fun MainTabsScaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 2.dp
-                ) {
-                    MainTab.entries.forEach { tab ->
-                        val active = selectedTab == tab
-                        val (filled, outlined) = tabIcons.getValue(tab)
-                        NavigationBarItem(
-                            selected = active,
-                            onClick = { onSelectTab(tab) },
-                            icon = { Icon(if (active) filled else outlined, contentDescription = tab.label) },
-                            label = { Text(tab.label) },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary
-                            ),
-                            modifier = Modifier.testTag("nav_tab_${tab.name.lowercase()}")
-                        )
+                Column {
+                    AdMobBannerBar()
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 2.dp
+                    ) {
+                        MainTab.entries.forEach { tab ->
+                            val active = selectedTab == tab
+                            val (filled, outlined) = tabIcons.getValue(tab)
+                            NavigationBarItem(
+                                selected = active,
+                                onClick = { onSelectTab(tab) },
+                                icon = { Icon(if (active) filled else outlined, contentDescription = tab.label) },
+                                label = { Text(tab.label) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary
+                                ),
+                                modifier = Modifier.testTag("nav_tab_${tab.name.lowercase()}")
+                            )
+                        }
                     }
                 }
             }

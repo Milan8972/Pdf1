@@ -189,16 +189,6 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun openTool(toolId: ToolId, preselectedDocIds: List<Long> = emptyList()) {
-        val s = settings.value
-        if (toolId.isProTool && !s.isPro) {
-            val today = todayDateKey()
-            val countToday = if (s.lastUsageDate == today) s.dailyHeavyToolCount else 0
-            if (countToday >= 2) {
-                emitMessage("Daily free limit reached for ${toolId.title}. Unlock Pro in Settings.")
-                popToMainTabs(MainTab.SETTINGS)
-                return
-            }
-        }
         navigateTo(AppDestination.ToolFlow(toolId, preselectedDocIds))
     }
 
@@ -308,11 +298,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
                     allowEdit = result.allowEdit,
                     extractedText = result.extractedText ?: ""
                 )
-                settingsStore.recordToolUsage(
-                    toolKey = tool.name,
-                    isHeavy = tool.isProTool || tool == ToolId.COMPRESS || tool == ToolId.MERGE,
-                    todayKey = todayDateKey()
-                )
+                settingsStore.recordToolUsage(toolKey = tool.name)
                 onSuccess(result, savedDoc)
             } catch (_: CancellationException) {
                 onError("Cancelled")
@@ -514,19 +500,10 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     // Settings mutators
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settingsStore.setThemeMode(mode) }
     fun setAccentPreset(preset: AccentPreset) = viewModelScope.launch { settingsStore.setAccentPreset(preset) }
-    fun setAskMobileData(v: Boolean) = viewModelScope.launch { settingsStore.setAskMobileData(v) }
     fun setDefaultSaveFolder(f: String) = viewModelScope.launch { settingsStore.setDefaultSaveFolder(f) }
     fun setOcrLanguage(l: String) = viewModelScope.launch { settingsStore.setOcrLanguage(l) }
     fun setDefaultImageQuality(q: Int) = viewModelScope.launch { settingsStore.setDefaultImageQuality(q) }
     fun setKeepOriginalFiles(k: Boolean) = viewModelScope.launch { settingsStore.setKeepOriginalFiles(k) }
-    fun setLocalProfile(name: String, email: String) = viewModelScope.launch {
-        settingsStore.setLocalProfile(name, email)
-        emitMessage("Local profile saved on this device")
-    }
-    fun setProEnabled(enabled: Boolean) = viewModelScope.launch {
-        settingsStore.setProEnabled(enabled)
-        emitMessage(if (enabled) "Pro tools unlocked (demo mode)" else "Switched to Free plan")
-    }
 
     fun emitMessage(msg: String) {
         _snackbarEvents.tryEmit(SnackbarEvent(msg))
@@ -540,7 +517,4 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
             .mapNotNull { entry -> ToolId.entries.firstOrNull { it.name == entry.key } }
         return (sortedUsed + ToolId.defaultQuickTools).distinct().take(6)
     }
-
-    private fun todayDateKey(): String =
-        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 }

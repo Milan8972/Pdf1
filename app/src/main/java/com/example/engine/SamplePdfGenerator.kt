@@ -396,7 +396,7 @@ object SamplePdfGenerator {
             drawSectionBlock(c, 185f, "LOCAL-FIRST ARCHITECTURE", listOf(
                 "• Zero cloud uploads: every merge, split, edit, and scan runs locally.",
                 "• Works offline on flights, commutes, and restricted networks.",
-                "• No account required: optional local profile stays strictly on this phone.",
+                "• 100% local workspace: no accounts, no sign-ins, and no cloud sync.",
                 "• Original files remain untouched whenever you export edited copies."
             ))
             drawFooter(c, "paperpilot Welcome Guide", 4, 4)
@@ -432,7 +432,7 @@ object SamplePdfGenerator {
                 blockDesc(3, 0.07f, 0.048f, 0.76f, 0.040f, 24f, "#FFFFFF", "#157C7D", true, "LEFT", "PRIVATE BY DESIGN"),
                 blockDesc(3, 0.07f, 0.092f, 0.86f, 0.028f, 13f, "#FFFFFF", "#176B73", false, "LEFT", "Your documents never leave your Android device"),
                 blockDesc(3, 0.08f, 0.204f, 0.52f, 0.024f, 13f, "#D03A44", "#FFFFFF", true, "LEFT", "LOCAL-FIRST ARCHITECTURE"),
-                blockDesc(3, 0.08f, 0.236f, 0.84f, 0.125f, 13.5f, "#1A1523", "#FFFFFF", false, "LEFT", "• Zero cloud uploads: every merge, split, edit, and scan runs locally.\\n• Works offline on flights, commutes, and restricted networks.\\n• No account required: optional local profile stays strictly on this phone.")
+                blockDesc(3, 0.08f, 0.236f, 0.84f, 0.125f, 13.5f, "#1A1523", "#FFFFFF", false, "LEFT", "• Zero cloud uploads: every merge, split, edit, and scan runs locally.\\n• Works offline on flights, commutes, and restricted networks.\\n• 100% local workspace: no accounts, no sign-ins, and no cloud sync.")
             )
         )
         return allText.toString().trim()

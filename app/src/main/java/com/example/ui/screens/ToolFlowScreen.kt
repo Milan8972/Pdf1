@@ -98,6 +98,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
+import com.example.ads.AdMobBannerBar
+import com.example.ads.AdMobManager
+import com.example.ads.findActivity
 import com.example.data.DocumentEntity
 import com.example.data.DocumentSource
 import com.example.engine.CompressionLevel
@@ -518,6 +521,7 @@ fun ToolFlowScreen(
                                             outputResult = res
                                             outputDoc = saved
                                             step = ToolStep.RESULT
+                                            AdMobManager.showInterstitialIfReady(context.findActivity())
                                         },
                                         onError = { err ->
                                             if (err == "Cancelled") step = ToolStep.OPTIONS
@@ -765,6 +769,9 @@ fun ToolFlowScreen(
                                     Text(stringResource(R.string.action_process_another))
                                 }
                             }
+                        }
+                        item {
+                            AdMobBannerBar()
                         }
                     }
                 }

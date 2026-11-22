@@ -155,15 +155,76 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Prepare APK release asset
+      - name: Build debug AAB
+        shell: bash
+        run: gradle :app:bundleDebug --stacktrace --no-daemon
+
+      - name: Verify debug AAB
+        id: verify_aab
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_AAB="app/build/outputs/bundle/debug/app-debug.aab"
+
+          if [ ! -e "${EXPECTED_AAB}" ]; then
+            echo "::error::Expected debug AAB not found at ${EXPECTED_AAB}."
+            if [ -d "app/build/outputs/bundle" ]; then
+              echo "Discovered AAB files inside app/build/outputs/bundle:"
+              FOUND_AABS="$(find app/build/outputs/bundle -type f -name '*.aab' | sort || true)"
+              if [ -n "${FOUND_AABS}" ]; then
+                printf '%s\n' "${FOUND_AABS}"
+              else
+                echo "(none)"
+              fi
+            else
+              echo "Directory app/build/outputs/bundle does not exist."
+            fi
+            exit 1
+          fi
+
+          if [ ! -f "${EXPECTED_AAB}" ]; then
+            echo "::error::${EXPECTED_AAB} is not a regular file."
+            exit 1
+          fi
+
+          if [ ! -s "${EXPECTED_AAB}" ]; then
+            echo "::error::${EXPECTED_AAB} is empty."
+            exit 1
+          fi
+
+          case "${EXPECTED_AAB}" in
+            *.aab) ;;
+            *)
+              echo "::error::${EXPECTED_AAB} does not have the .aab extension."
+              exit 1
+              ;;
+          esac
+
+          echo "Verified debug AAB: ${EXPECTED_AAB} ($(stat -c%s "${EXPECTED_AAB}") bytes)"
+
+      - name: Upload debug AAB artifact
+        id: upload_aab_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-aab
+          path: app/build/outputs/bundle/debug/app-debug.aab
+          if-no-files-found: error
+
+      - name: Prepare APK and AAB release assets
         id: prepare_release_asset
         shell: bash
         run: |
           set -euo pipefail
           SOURCE_APK="app/build/outputs/apk/debug/app-debug.apk"
+          SOURCE_AAB="app/build/outputs/bundle/debug/app-debug.aab"
 
           if [ ! -f "${SOURCE_APK}" ] || [ ! -s "${SOURCE_APK}" ]; then
             echo "::error::Verified debug APK is unavailable for release preparation."
+            exit 1
+          fi
+
+          if [ ! -f "${SOURCE_AAB}" ] || [ ! -s "${SOURCE_AAB}" ]; then
+            echo "::error::Verified debug AAB is unavailable for release preparation."
             exit 1
           fi
 
@@ -177,27 +238,39 @@ jobs:
           fi
 
           ASSET_NAME="${SAFE_REPO_NAME}-debug-build-${GITHUB_RUN_NUMBER}.apk"
+          AAB_ASSET_NAME="${SAFE_REPO_NAME}-debug-build-${GITHUB_RUN_NUMBER}.aab"
           RELEASE_DIR="$(mktemp -d "${RUNNER_TEMP}/apk-release-XXXXXX")"
           ASSET_PATH="${RELEASE_DIR}/${ASSET_NAME}"
+          AAB_ASSET_PATH="${RELEASE_DIR}/${AAB_ASSET_NAME}"
 
           cp "${SOURCE_APK}" "${ASSET_PATH}"
+          cp "${SOURCE_AAB}" "${AAB_ASSET_PATH}"
 
           if [ ! -f "${ASSET_PATH}" ] || [ ! -s "${ASSET_PATH}" ]; then
             echo "::error::Failed to copy debug APK to temporary release directory."
             exit 1
           fi
 
+          if [ ! -f "${AAB_ASSET_PATH}" ] || [ ! -s "${AAB_ASSET_PATH}" ]; then
+            echo "::error::Failed to copy debug AAB to temporary release directory."
+            exit 1
+          fi
+
           echo "asset_path=${ASSET_PATH}" >> "${GITHUB_OUTPUT}"
           echo "asset_name=${ASSET_NAME}" >> "${GITHUB_OUTPUT}"
-          echo "Prepared release asset: ${ASSET_NAME}"
+          echo "aab_asset_path=${AAB_ASSET_PATH}" >> "${GITHUB_OUTPUT}"
+          echo "aab_asset_name=${AAB_ASSET_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "Prepared release assets: ${ASSET_NAME}, ${AAB_ASSET_NAME}"
 
-      - name: Publish APK to GitHub Releases
+      - name: Publish APK and AAB to GitHub Releases
         id: publish_release
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           ASSET_PATH: ${{ steps.prepare_release_asset.outputs.asset_path }}
           ASSET_NAME: ${{ steps.prepare_release_asset.outputs.asset_name }}
+          AAB_ASSET_PATH: ${{ steps.prepare_release_asset.outputs.aab_asset_path }}
+          AAB_ASSET_NAME: ${{ steps.prepare_release_asset.outputs.aab_asset_name }}
         shell: bash
         run: |
           set -euo pipefail
@@ -208,14 +281,27 @@ jobs:
           fi
 
           if [ -z "${ASSET_PATH}" ] || [ ! -f "${ASSET_PATH}" ] || [ ! -s "${ASSET_PATH}" ]; then
-            echo "::warning::Prepared release asset is missing or empty. Skipping GitHub Release publishing."
+            echo "::warning::Prepared APK release asset is missing or empty. Skipping GitHub Release publishing."
             exit 1
           fi
 
           case "${ASSET_PATH}" in
             *.apk) ;;
             *)
-              echo "::warning::Prepared release asset does not have a .apk extension. Skipping GitHub Release publishing."
+              echo "::warning::Prepared APK release asset does not have a .apk extension. Skipping GitHub Release publishing."
+              exit 1
+              ;;
+          esac
+
+          if [ -z "${AAB_ASSET_PATH}" ] || [ ! -f "${AAB_ASSET_PATH}" ] || [ ! -s "${AAB_ASSET_PATH}" ]; then
+            echo "::warning::Prepared AAB release asset is missing or empty. Skipping GitHub Release publishing."
+            exit 1
+          fi
+
+          case "${AAB_ASSET_PATH}" in
+            *.aab) ;;
+            *)
+              echo "::warning::Prepared AAB release asset does not have a .aab extension. Skipping GitHub Release publishing."
               exit 1
               ;;
           esac
@@ -224,21 +310,22 @@ jobs:
           RELEASE_TITLE="Debug APK Build #${GITHUB_RUN_NUMBER}"
 
           RELEASE_NOTES=$(cat <<EOF
-          This is an automatically generated debug APK built by GitHub Actions.
+          This is an automatically generated debug APK and debug AAB built by GitHub Actions.
 
           - **Workflow run number:** ${GITHUB_RUN_NUMBER}
           - **Workflow run attempt:** ${GITHUB_RUN_ATTEMPT}
           - **Source commit SHA:** ${GITHUB_SHA}
           - **APK asset:** \`${ASSET_NAME}\`
+          - **AAB asset:** \`${AAB_ASSET_NAME}\`
 
           **Important notes:**
-          - This APK is intended for testing only.
-          - This APK is **not** a Google Play Store production release.
-          - This APK is signed only with a temporary debug keystore generated on the workflow runner.
+          - These debug builds are intended for testing only.
+          - They are **not** a Google Play Store production release.
+          - Both files are signed only with a temporary debug keystore generated on the workflow runner.
           EOF
           )
 
-          gh release create "${RELEASE_TAG}" "${ASSET_PATH}" \
+          gh release create "${RELEASE_TAG}" "${ASSET_PATH}" "${AAB_ASSET_PATH}" \
             --title "${RELEASE_TITLE}" \
             --target "${GITHUB_SHA}" \
             --latest \
@@ -250,6 +337,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PUBLISH_OUTCOME: ${{ steps.publish_release.outcome }}
           ASSET_NAME: ${{ steps.prepare_release_asset.outputs.asset_name }}
+          AAB_ASSET_NAME: ${{ steps.prepare_release_asset.outputs.aab_asset_name }}
           RELEASE_TAG: debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}
           RELEASE_TITLE: Debug APK Build #${{ github.run_number }}
         shell: bash
@@ -270,29 +358,31 @@ jobs:
             echo "Release title: ${RELEASE_TITLE}"
             echo "Release URL: ${RELEASE_URL}"
             echo "APK asset filename: ${ASSET_NAME}"
+            echo "AAB asset filename: ${AAB_ASSET_NAME}"
 
             {
-              echo "## Debug APK Download"
+              echo "## Debug APK & AAB Download"
               echo ""
-              echo "The debug APK was built and published to GitHub Releases."
+              echo "The debug APK and debug AAB were built and published to GitHub Releases."
               echo ""
               echo "- **Release title:** ${RELEASE_TITLE}"
               echo "- **Release tag:** \`${RELEASE_TAG}\`"
               echo "- **APK asset:** \`${ASSET_NAME}\`"
+              echo "- **AAB asset:** \`${AAB_ASSET_NAME}\`"
               echo "- **Release page:** ${RELEASE_URL}"
               echo ""
-              echo "Open the release page above and download \`${ASSET_NAME}\` directly from the **Assets** section."
+              echo "Open the release page above to download \`${ASSET_NAME}\` or \`${AAB_ASSET_NAME}\` directly from the **Assets** section."
               echo ""
-              echo "The standard GitHub Actions artifact (\`app-debug-apk\`) is also available on this workflow run as a backup."
+              echo "The standard GitHub Actions artifacts (\`app-debug-apk\` and \`app-debug-aab\`) are also available on this workflow run as backups."
             } >> "${GITHUB_STEP_SUMMARY}"
           else
-            echo "::warning::GitHub Release publishing failed, but the debug APK build succeeded and the GitHub Actions artifact 'app-debug-apk' remains available for download."
+            echo "::warning::GitHub Release publishing failed, but the debug APK and AAB builds succeeded and the GitHub Actions artifacts 'app-debug-apk' and 'app-debug-aab' remain available for download."
 
             {
-              echo "## Debug APK Download (Release Publishing Warning)"
+              echo "## Debug APK & AAB Download (Release Publishing Warning)"
               echo ""
               echo "> **Warning:** Publishing to GitHub Releases did not succeed."
               echo ""
-              echo "The debug APK build **succeeded**, and the GitHub Actions artifact named \`app-debug-apk\` remains available for download on this workflow run as a backup."
+              echo "The debug APK and debug AAB builds **succeeded**, and the GitHub Actions artifacts named \`app-debug-apk\` and \`app-debug-aab\` remain available for download on this workflow run as backups."
             } >> "${GITHUB_STEP_SUMMARY}"
           fi

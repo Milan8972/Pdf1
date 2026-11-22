@@ -27,8 +27,8 @@ import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DocumentScanner
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -80,7 +80,6 @@ import com.example.ui.theme.TintScan
 fun HomeScreen(
     documents: List<DocumentEntity>,
     quickTools: List<ToolId>,
-    isPro: Boolean,
     isLoading: Boolean,
     onOpenDocument: (DocumentEntity) -> Unit,
     onToggleFavorite: (DocumentEntity) -> Unit,
@@ -144,12 +143,12 @@ fun HomeScreen(
                             onClick = onOpenSettings,
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(40.dp).testTag("home_profile_button")
+                            modifier = Modifier.size(40.dp).testTag("home_settings_button")
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Person,
-                                    contentDescription = "Open Settings and Profile",
+                                    imageVector = Icons.Rounded.Settings,
+                                    contentDescription = "Open Settings",
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -263,7 +262,6 @@ fun HomeScreen(
                         items(quickTools, key = { it.name }) { tool ->
                             ToolTile(
                                 tool = tool,
-                                isProUnlocked = isPro,
                                 onClick = { onOpenTool(tool) },
                                 modifier = Modifier.width(108.dp)
                             )
