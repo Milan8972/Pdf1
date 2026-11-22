@@ -1,0 +1,6 @@
+{
+  "name": "paperpilot",
+  "description": "Private, on-device Android PDF toolkit to merge, split, compress, convert, scan, edit, annotate, and sign PDFs completely offline.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
