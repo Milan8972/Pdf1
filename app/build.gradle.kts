@@ -68,6 +68,22 @@ android {
     includeInApk = false
     includeInBundle = true
   }
+  bundle {
+    language {
+      enableSplit = true
+    }
+    density {
+      enableSplit = true
+    }
+    abi {
+      enableSplit = true
+    }
+  }
+  packaging {
+    resources {
+      excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    }
+  }
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files

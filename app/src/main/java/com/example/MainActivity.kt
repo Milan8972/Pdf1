@@ -113,6 +113,7 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val documents by viewModel.documents.collectAsStateWithLifecycle()
+    val trashedDocuments by viewModel.trashedDocuments.collectAsStateWithLifecycle()
     val signatures by viewModel.signatures.collectAsStateWithLifecycle()
     val scannedImages by viewModel.scannedImages.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
@@ -121,6 +122,7 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
     val passwordPromptDoc by viewModel.passwordPromptDoc.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val pendingImportSource = remember { androidx.compose.runtime.mutableStateOf(DocumentSource.OPENED) }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarEvents.collect { event ->
@@ -139,8 +141,13 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (uris.isNotEmpty()) {
-            viewModel.importUris(uris, DocumentSource.OPENED)
+            viewModel.importUris(uris, pendingImportSource.value)
         }
+    }
+
+    fun launchDeviceImport(source: DocumentSource = DocumentSource.OPENED) {
+        pendingImportSource.value = source
+        importDeviceLauncher.launch(arrayOf("application/pdf", "image/*"))
     }
 
     fun triggerShare(doc: DocumentEntity) {
@@ -277,7 +284,7 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
                                     onOpenSettings = { viewModel.selectTab(MainTab.SETTINGS) },
                                     onSeeAllTools = { viewModel.selectTab(MainTab.TOOLS) },
                                     onImportFromDevice = {
-                                        importDeviceLauncher.launch(arrayOf("application/pdf", "image/*"))
+                                        launchDeviceImport(DocumentSource.OPENED)
                                     },
                                     onCreateFromTemplate = {
                                         viewModel.navigateTo(AppDestination.TemplatesPicker)
@@ -287,6 +294,7 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
 
                                 MainTab.FILES -> FilesScreen(
                                     documents = documents,
+                                    trashedDocuments = trashedDocuments,
                                     isWideLayout = isWideLayout,
                                     onOpenDocument = { viewModel.openDocument(it) },
                                     onRenameDocument = { doc, name -> viewModel.renameDocument(doc, name) },
@@ -294,12 +302,16 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onDeleteDocument = { viewModel.deleteDocumentWithUndo(it) },
                                     onDeleteMultiple = { viewModel.deleteDocumentsWithUndo(it) },
+                                    onRestoreFromBin = { viewModel.restoreFromBin(it) },
+                                    onPermanentlyDelete = { viewModel.permanentlyDeleteDocument(it) },
+                                    onEmptyBin = { viewModel.emptyBin() },
                                     onMergeSelected = { docs ->
                                         viewModel.openTool(ToolId.MERGE, docs.map { it.id })
                                     },
-                                    onImportFromDevice = {
-                                        importDeviceLauncher.launch(arrayOf("application/pdf", "image/*"))
+                                    onImportFromDevice = { source ->
+                                        launchDeviceImport(source)
                                     },
+                                    onOpenSettings = { viewModel.selectTab(MainTab.SETTINGS) },
                                     modifier = contentModifier
                                 )
 

@@ -34,6 +34,7 @@ class DocumentRepository(
         get() = File(context.filesDir, "paperpilot_scans").apply { mkdirs() }
 
     val allDocuments: Flow<List<DocumentEntity>> = docDao.getAllDocuments()
+    val trashedDocuments: Flow<List<DocumentEntity>> = docDao.getTrashedDocuments()
     val allSignatures: Flow<List<SignatureEntity>> = sigDao.getAllSignatures()
     val allScannedImages: Flow<List<ScannedImageEntity>> = scanDao.getAllScannedImages()
 
@@ -61,15 +62,34 @@ class DocumentRepository(
 
     suspend fun touchOpened(id: Long) = docDao.touchOpened(id)
 
-    suspend fun deleteDocument(doc: DocumentEntity) = withContext(Dispatchers.IO) {
-        docDao.delete(doc)
-        // Keep physical file until undo window passes if needed, or remove thumbnail cleanly
+    suspend fun moveToBin(doc: DocumentEntity) = withContext(Dispatchers.IO) {
+        docDao.setTrashed(doc.id, true)
     }
 
-    suspend fun restoreDocument(doc: DocumentEntity): Long = docDao.insert(doc)
+    suspend fun moveToBinMultiple(docs: List<DocumentEntity>) = withContext(Dispatchers.IO) {
+        if (docs.isNotEmpty()) docDao.setTrashedByIds(docs.map { it.id }, true)
+    }
 
-    suspend fun deleteDocuments(docs: List<DocumentEntity>) = withContext(Dispatchers.IO) {
-        docDao.deleteByIds(docs.map { it.id })
+    suspend fun restoreFromBin(doc: DocumentEntity) = withContext(Dispatchers.IO) {
+        docDao.setTrashed(doc.id, false)
+    }
+
+    suspend fun restoreFromBinMultiple(docs: List<DocumentEntity>) = withContext(Dispatchers.IO) {
+        if (docs.isNotEmpty()) docDao.setTrashedByIds(docs.map { it.id }, false)
+    }
+
+    suspend fun permanentlyDeleteDocument(doc: DocumentEntity) = withContext(Dispatchers.IO) {
+        docDao.delete(doc)
+        runCatching { File(doc.filePath).delete() }
+        doc.thumbnailPath?.let { runCatching { File(it).delete() } }
+    }
+
+    suspend fun emptyBin(trashed: List<DocumentEntity>) = withContext(Dispatchers.IO) {
+        docDao.emptyBin()
+        trashed.forEach { doc ->
+            runCatching { File(doc.filePath).delete() }
+            doc.thumbnailPath?.let { runCatching { File(it).delete() } }
+        }
     }
 
     suspend fun importFromUri(uri: Uri, source: DocumentSource = DocumentSource.OPENED): DocumentEntity? =

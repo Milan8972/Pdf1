@@ -80,6 +80,12 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
         initialValue = emptyList()
     )
 
+    val trashedDocuments: StateFlow<List<DocumentEntity>> = repository.trashedDocuments.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
     val signatures: StateFlow<List<SignatureEntity>> = repository.allSignatures.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -237,13 +243,13 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
 
     fun deleteDocumentWithUndo(doc: DocumentEntity) {
         viewModelScope.launch {
-            repository.deleteDocument(doc)
+            repository.moveToBin(doc)
             _snackbarEvents.tryEmit(
                 SnackbarEvent(
-                    message = "Deleted ${doc.name}",
+                    message = "Moved ${doc.name} to Bin",
                     actionLabel = "Undo",
                     onAction = {
-                        viewModelScope.launch { repository.restoreDocument(doc) }
+                        viewModelScope.launch { repository.restoreFromBin(doc) }
                     }
                 )
             )
@@ -253,18 +259,39 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     fun deleteDocumentsWithUndo(docs: List<DocumentEntity>) {
         if (docs.isEmpty()) return
         viewModelScope.launch {
-            repository.deleteDocuments(docs)
+            repository.moveToBinMultiple(docs)
             _snackbarEvents.tryEmit(
                 SnackbarEvent(
-                    message = "Deleted ${docs.size} files",
+                    message = "Moved ${docs.size} files to Bin",
                     actionLabel = "Undo",
                     onAction = {
-                        viewModelScope.launch {
-                            docs.forEach { repository.restoreDocument(it) }
-                        }
+                        viewModelScope.launch { repository.restoreFromBinMultiple(docs) }
                     }
                 )
             )
+        }
+    }
+
+    fun restoreFromBin(doc: DocumentEntity) {
+        viewModelScope.launch {
+            repository.restoreFromBin(doc)
+            emitMessage("Restored ${doc.name}")
+        }
+    }
+
+    fun permanentlyDeleteDocument(doc: DocumentEntity) {
+        viewModelScope.launch {
+            repository.permanentlyDeleteDocument(doc)
+            emitMessage("Permanently deleted ${doc.name}")
+        }
+    }
+
+    fun emptyBin() {
+        val currentTrashed = trashedDocuments.value
+        if (currentTrashed.isEmpty()) return
+        viewModelScope.launch {
+            repository.emptyBin(currentTrashed)
+            emitMessage("Bin emptied")
         }
     }
 

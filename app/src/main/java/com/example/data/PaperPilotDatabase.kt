@@ -12,6 +12,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 enum class DocumentSource {
@@ -39,7 +41,8 @@ data class DocumentEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val lastOpenedAt: Long = System.currentTimeMillis(),
     val thumbnailPath: String? = null,
-    val extractedText: String = ""
+    val extractedText: String = "",
+    val isTrashed: Boolean = false
 )
 
 @Entity(tableName = "signatures")
@@ -62,8 +65,11 @@ data class ScannedImageEntity(
 
 @Dao
 interface DocumentDao {
-    @Query("SELECT * FROM documents ORDER BY lastOpenedAt DESC")
+    @Query("SELECT * FROM documents WHERE isTrashed = 0 ORDER BY lastOpenedAt DESC")
     fun getAllDocuments(): Flow<List<DocumentEntity>>
+
+    @Query("SELECT * FROM documents WHERE isTrashed = 1 ORDER BY lastOpenedAt DESC")
+    fun getTrashedDocuments(): Flow<List<DocumentEntity>>
 
     @Query("SELECT * FROM documents WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): DocumentEntity?
@@ -82,6 +88,15 @@ interface DocumentDao {
 
     @Query("DELETE FROM documents WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
+
+    @Query("DELETE FROM documents WHERE isTrashed = 1")
+    suspend fun emptyBin()
+
+    @Query("UPDATE documents SET isTrashed = :trashed WHERE id = :id")
+    suspend fun setTrashed(id: Long, trashed: Boolean)
+
+    @Query("UPDATE documents SET isTrashed = :trashed WHERE id IN (:ids)")
+    suspend fun setTrashedByIds(ids: List<Long>, trashed: Boolean)
 
     @Query("UPDATE documents SET isFavorite = :favorite WHERE id = :id")
     suspend fun setFavorite(id: Long, favorite: Boolean)
@@ -119,7 +134,7 @@ interface ScannedImageDao {
 
 @Database(
     entities = [DocumentEntity::class, SignatureEntity::class, ScannedImageEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class PaperPilotDatabase : RoomDatabase() {
@@ -131,13 +146,20 @@ abstract class PaperPilotDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: PaperPilotDatabase? = null
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE documents ADD COLUMN isTrashed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): PaperPilotDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     PaperPilotDatabase::class.java,
                     "paperpilot_local.db"
-                ).fallbackToDestructiveMigration(dropAllTables = true)
+                ).addMigrations(MIGRATION_1_2)
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }
             }
