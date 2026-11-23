@@ -3,29 +3,18 @@ package com.example.ui.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas as AndroidCanvas
-import android.graphics.Color as AndroidColor
-import android.graphics.Paint as AndroidPaint
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -35,53 +24,39 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.RotateRight
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ArrowBackIosNew
-import androidx.compose.material.icons.rounded.ArrowForwardIos
-import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.CameraAlt
-import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Cameraswitch
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.CropFree
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DocumentScanner
-import androidx.compose.material.icons.rounded.FlashOff
-import androidx.compose.material.icons.rounded.FlashOn
+import androidx.compose.material.icons.rounded.FlashlightOff
+import androidx.compose.material.icons.rounded.FlashlightOn
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -90,6 +65,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,35 +73,46 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.example.data.DocumentEntity
 import com.example.data.DocumentSource
 import com.example.data.ScannedImageEntity
+import com.example.engine.MarginOption
+import com.example.engine.PageSizeOption
 import com.example.engine.PdfRenderHelper
 import com.example.engine.ScanFilter
+import com.example.ui.components.CameraCapabilities
+import com.example.ui.components.CameraXDocumentPreview
+import com.example.ui.components.CapturedScanPage
+import com.example.ui.components.DocumentGuideOverlay
 import com.example.ui.components.EmptyStateBlock
 import com.example.ui.components.FileListRow
+import com.example.ui.components.FlashModeOption
+import com.example.ui.components.ScanCropStep
+import com.example.ui.components.ScanFilterStep
+import com.example.ui.components.ScanReviewStep
 import com.example.ui.theme.BrandAmber
 import com.example.ui.theme.BrandCoral
 import com.example.ui.theme.LocalPaperPilotColors
 import com.example.ui.theme.TintScan
 import com.example.viewmodel.PaperPilotViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.math.roundToInt
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.Executors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,7 +140,9 @@ fun ScannerTabLanding(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
             )
             SingleChoiceSegmentedButtonRow(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
             ) {
                 SegmentedButton(
                     selected = selectedTab == 0,
@@ -174,7 +163,7 @@ fun ScannerTabLanding(
                 if (scannedImages.isEmpty()) {
                     EmptyStateBlock(
                         title = "No scanned images yet",
-                        subtitle = "Capture receipts, whiteboards, or multi-page paper documents right on your device.",
+                        subtitle = "Capture receipts, whiteboards, or multi-page paper documents and convert them into a single PDF.",
                         actionLabel = "Start scanning",
                         onAction = onStartScan,
                         modifier = Modifier.weight(1f)
@@ -198,11 +187,18 @@ fun ScannerTabLanding(
                                         model = File(img.imagePath),
                                         contentDescription = img.name,
                                         contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxWidth().aspectRatio(0.78f).clip(RoundedCornerShape(12.dp))
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(0.78f)
+                                            .clip(RoundedCornerShape(12.dp))
                                     )
                                     Spacer(Modifier.height(6.dp))
                                     Text(img.name, style = MaterialTheme.typography.labelMedium, maxLines = 1)
-                                    Text(img.filterName, style = MaterialTheme.typography.labelSmall, color = LocalPaperPilotColors.current.mutedText)
+                                    Text(
+                                        img.filterName,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = LocalPaperPilotColors.current.mutedText
+                                    )
                                 }
                             }
                         }
@@ -212,7 +208,7 @@ fun ScannerTabLanding(
                 if (scannedPdfs.isEmpty()) {
                     EmptyStateBlock(
                         title = "No scanned PDFs yet",
-                        subtitle = "Scan one or more pages and turn them into a clean, searchable PDF.",
+                        subtitle = "Scan one or more pages with CameraX and combine them into a clean single PDF.",
                         actionLabel = "Scan to PDF",
                         onAction = onStartScan,
                         modifier = Modifier.weight(1f)
@@ -255,23 +251,18 @@ fun ScannerTabLanding(
                 .clickable(onClick = onStartScan)
                 .testTag("scanner_launch_fab")
         ) {
-            Icon(Icons.Rounded.DocumentScanner, contentDescription = "Open camera scanner", tint = Color.White, modifier = Modifier.size(30.dp))
+            Icon(
+                Icons.Rounded.DocumentScanner,
+                contentDescription = "Open camera scanner",
+                tint = Color.White,
+                modifier = Modifier.size(30.dp)
+            )
         }
     }
 }
 
 private enum class ScanStep { CAMERA, CROP, FILTER, REVIEW }
 
-private data class CapturedScanPage(
-    val rawFile: File,
-    val processedFile: File,
-    val filter: ScanFilter = ScanFilter.AUTO_ENHANCE,
-    val brightness: Float = 0f,
-    val contrast: Float = 1f,
-    val rotation: Float = 0f
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScannerFlowScreen(
     viewModel: PaperPilotViewModel,
@@ -280,62 +271,135 @@ fun ScannerFlowScreen(
     onPdfCreated: (DocumentEntity) -> Unit
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val captureExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    DisposableEffect(Unit) {
+        onDispose { captureExecutor.shutdown() }
+    }
 
     var step by remember { mutableStateOf(ScanStep.CAMERA) }
     var batchPages by remember { mutableStateOf<List<CapturedScanPage>>(emptyList()) }
     var workingRawFile by remember { mutableStateOf<File?>(null) }
 
+    // CameraX controls & capture state
+    var hasCameraPerm by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var cameraAvailable by remember { mutableStateOf(true) }
+    var cameraErrorMessage by remember { mutableStateOf<String?>(null) }
+    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
+    var capabilities by remember { mutableStateOf(CameraCapabilities()) }
+    var useFrontCamera by remember { mutableStateOf(false) }
+    var flashMode by remember { mutableStateOf(FlashModeOption.AUTO) }
+    var torchEnabled by remember { mutableStateOf(false) }
+    var zoomRatio by remember { mutableFloatStateOf(1f) }
+    var batchCaptureMode by remember { mutableStateOf(true) } // true = rapid multi-page batch capture
+    var isCapturing by remember { mutableStateOf(false) }
+    var shutterFlash by remember { mutableStateOf(false) }
+
     // Crop corners (normalized 0..1)
-    var tl by remember { mutableStateOf(Offset(0.08f, 0.08f)) }
-    var tr by remember { mutableStateOf(Offset(0.92f, 0.08f)) }
-    var bl by remember { mutableStateOf(Offset(0.08f, 0.92f)) }
-    var br by remember { mutableStateOf(Offset(0.92f, 0.92f)) }
+    var tl by remember { mutableStateOf(Offset(0.06f, 0.06f)) }
+    var tr by remember { mutableStateOf(Offset(0.94f, 0.06f)) }
+    var bl by remember { mutableStateOf(Offset(0.06f, 0.94f)) }
+    var br by remember { mutableStateOf(Offset(0.94f, 0.94f)) }
     var cropRotation by remember { mutableFloatStateOf(0f) }
 
     // Filter state
     var selectedFilter by remember { mutableStateOf(ScanFilter.AUTO_ENHANCE) }
     var brightness by remember { mutableFloatStateOf(0f) }
     var contrast by remember { mutableFloatStateOf(1f) }
+    var isSavingPage by remember { mutableStateOf(false) }
 
-    // Review OCR state
+    // Review & single-PDF export options
+    var pdfTitle by remember {
+        mutableStateOf("Scan_${SimpleDateFormat("MMMdd_HHmm", Locale.US).format(Date())}")
+    }
+    var pageSize by remember { mutableStateOf(PageSizeOption.A4) }
+    var pageMargin by remember { mutableStateOf(MarginOption.NONE) }
     var enableOcr by remember { mutableStateOf(true) }
     var ocrLang by remember { mutableStateOf(defaultOcrLang) }
+    var isCreatingPdf by remember { mutableStateOf(false) }
 
-    // Camera permission state
-    var hasCameraPerm by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        )
+    LaunchedEffect(shutterFlash) {
+        if (shutterFlash) {
+            delay(160)
+            shutterFlash = false
+        }
     }
-    var flashOn by remember { mutableStateOf(false) }
-    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
-    var cameraAvailable by remember { mutableStateOf(true) }
 
     val permLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasCameraPerm = granted
+        if (granted) {
+            cameraAvailable = true
+            cameraErrorMessage = null
+        }
     }
 
     LaunchedEffect(Unit) {
         if (!hasCameraPerm) permLauncher.launch(Manifest.permission.CAMERA)
     }
 
+    suspend fun autoEnhanceToPage(rawFile: File): CapturedScanPage? = withContext(Dispatchers.IO) {
+        val decoded = PdfRenderHelper.decodeSampledBitmap(rawFile, 1600) ?: return@withContext null
+        val enhanced = PdfRenderHelper.applyScanTransform(
+            src = decoded,
+            filter = ScanFilter.AUTO_ENHANCE
+        )
+        val processedFile = File(viewModel.repository.scansDir, "processed_${System.currentTimeMillis()}_${rawFile.name}")
+        FileOutputStream(processedFile).use { enhanced.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+        if (enhanced !== decoded) enhanced.recycle()
+        decoded.recycle()
+        CapturedScanPage(
+            rawFile = rawFile,
+            processedFile = processedFile,
+            filter = ScanFilter.AUTO_ENHANCE
+        )
+    }
+
+    // Zero-permission Android Photo Picker supporting multi-image selection into one PDF
     val galleryImport = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            val raw = File(viewModel.repository.scansDir, "raw_import_${System.currentTimeMillis()}.jpg")
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                raw.outputStream().use { input.copyTo(it) }
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 20)
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        scope.launch {
+            isCapturing = true
+            val importedFiles = withContext(Dispatchers.IO) {
+                viewModel.repository.scansDir.mkdirs()
+                uris.mapIndexedNotNull { idx, uri ->
+                    val raw = File(viewModel.repository.scansDir, "import_${System.currentTimeMillis()}_$idx.jpg")
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            raw.outputStream().use { input.copyTo(it) }
+                        }
+                        if (raw.exists() && raw.length() > 0L) raw else null
+                    }.getOrNull()
+                }
             }
-            if (raw.exists()) {
-                workingRawFile = raw
+            if (importedFiles.isEmpty()) {
+                isCapturing = false
+                snackbarHostState.showSnackbar("Could not read selected image(s).")
+                return@launch
+            }
+            if (importedFiles.size == 1 && !batchCaptureMode) {
+                workingRawFile = importedFiles.first()
                 tl = Offset(0.06f, 0.06f); tr = Offset(0.94f, 0.06f)
                 bl = Offset(0.06f, 0.94f); br = Offset(0.94f, 0.94f)
                 cropRotation = 0f
+                isCapturing = false
                 step = ScanStep.CROP
+            } else {
+                val newPages = importedFiles.mapNotNull { autoEnhanceToPage(it) }
+                batchPages = batchPages + newPages
+                isCapturing = false
+                if (newPages.isNotEmpty()) {
+                    step = ScanStep.REVIEW
+                }
             }
         }
     }
@@ -345,540 +409,491 @@ fun ScannerFlowScreen(
             ScanStep.CAMERA -> onBack()
             ScanStep.CROP -> step = ScanStep.CAMERA
             ScanStep.FILTER -> step = ScanStep.CROP
-            ScanStep.REVIEW -> step = ScanStep.CAMERA
+            ScanStep.REVIEW -> if (!isCreatingPdf) step = ScanStep.CAMERA
         }
-    }
-
-    fun captureFallbackSamplePage() {
-        val raw = File(viewModel.repository.scansDir, "scan_cap_${System.currentTimeMillis()}.jpg")
-        val bmp = Bitmap.createBitmap(900, 1200, Bitmap.Config.ARGB_8888)
-        val c = AndroidCanvas(bmp)
-        c.drawColor(AndroidColor.parseColor("#EFECE6"))
-        val paperPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.WHITE }
-        c.drawRect(70f, 90f, 830f, 1110f, paperPaint)
-        val headPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.parseColor("#1A1523")
-            textSize = 42f
-            isFakeBoldText = true
-        }
-        val linePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.parseColor("#4B5563")
-            textSize = 28f
-        }
-        c.drawText("SCANNED RECEIPT #${batchPages.size + 1}", 120f, 200f, headPaint)
-        c.drawText("Merchant: Cedar Coffee Roasters", 120f, 290f, linePaint)
-        c.drawText("Date: Nov 21, 2026", 120f, 350f, linePaint)
-        c.drawText("Items: Espresso + Notebook", 120f, 430f, linePaint)
-        c.drawText("Total Paid: $18.50", 120f, 520f, headPaint)
-        FileOutputStream(raw).use { bmp.compress(Bitmap.CompressFormat.JPEG, 92, it) }
-        bmp.recycle()
-        workingRawFile = raw
-        tl = Offset(0.08f, 0.08f); tr = Offset(0.92f, 0.08f)
-        bl = Offset(0.08f, 0.92f); br = Offset(0.92f, 0.92f)
-        cropRotation = 0f
-        step = ScanStep.CROP
     }
 
     when (step) {
         ScanStep.CAMERA -> {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
                 if (hasCameraPerm && cameraAvailable) {
-                    val previewView = remember { PreviewView(context) }
-                    DisposableEffect(lifecycleOwner, flashOn) {
-                        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                        val executor = ContextCompat.getMainExecutor(context)
-                        cameraProviderFuture.addListener({
-                            runCatching {
-                                val provider = cameraProviderFuture.get()
-                                val preview = Preview.Builder().build().also {
-                                    it.surfaceProvider = previewView.surfaceProvider
-                                }
-                                val cap = ImageCapture.Builder()
-                                    .setFlashMode(if (flashOn) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF)
-                                    .build()
-                                imageCapture = cap
-                                provider.unbindAll()
-                                provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, cap)
-                            }.onFailure {
-                                cameraAvailable = false
-                            }
-                        }, executor)
-                        onDispose {
-                            runCatching { cameraProviderFuture.get().unbindAll() }
-                        }
-                    }
-                    AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+                    CameraXDocumentPreview(
+                        useFrontCamera = useFrontCamera,
+                        flashMode = flashMode,
+                        torchEnabled = torchEnabled,
+                        zoomRatio = zoomRatio,
+                        onImageCaptureReady = { imageCapture = it },
+                        onCapabilitiesChanged = { caps ->
+                            capabilities = caps
+                            if (!caps.hasFlashUnit) torchEnabled = false
+                            if (zoomRatio > caps.maxZoomRatio) zoomRatio = 1f
+                        },
+                        onCameraUnavailable = { reason ->
+                            cameraAvailable = false
+                            cameraErrorMessage = reason
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    DocumentGuideOverlay(shutterFlashActive = shutterFlash)
                 } else {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxSize().padding(32.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp)
                     ) {
-                        Icon(Icons.Rounded.CameraAlt, null, tint = Color.White.copy(0.75f), modifier = Modifier.size(64.dp))
+                        Icon(
+                            Icons.Rounded.CameraAlt,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.78f),
+                            modifier = Modifier.size(64.dp)
+                        )
                         Spacer(Modifier.height(14.dp))
                         Text(
-                            text = if (!hasCameraPerm) "Camera permission needed for live scanning" else "Camera preview unavailable on this device",
+                            text = if (!hasCameraPerm) {
+                                "Camera permission required"
+                            } else {
+                                "Camera unavailable on this device"
+                            },
                             color = Color.White,
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "You can import a photo from your gallery or tap the shutter below to test the crop & filter pipeline.",
-                            color = Color.White.copy(0.7f),
-                            style = MaterialTheme.typography.bodySmall
+                            text = cameraErrorMessage
+                                ?: "Allow camera access to scan documents live, or import photos from your gallery to combine into a single PDF.",
+                            color = Color.White.copy(alpha = 0.72f),
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
                         )
+                        Spacer(Modifier.height(20.dp))
                         if (!hasCameraPerm) {
-                            Spacer(Modifier.height(16.dp))
-                            Button(onClick = { permLauncher.launch(Manifest.permission.CAMERA) }, shape = CircleShape) {
+                            Button(
+                                onClick = { permLauncher.launch(Manifest.permission.CAMERA) },
+                                shape = CircleShape,
+                                modifier = Modifier.testTag("scanner_grant_permission_button")
+                            ) {
                                 Text("Grant camera permission")
+                            }
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                galleryImport.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            shape = CircleShape,
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f))
+                        ) {
+                            Icon(Icons.Rounded.PhotoLibrary, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Import photos from gallery", color = Color.White)
+                        }
+                    }
+                }
+
+                // Top CameraX bar
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .testTag("scanner_close_button")
+                    ) {
+                        Icon(Icons.Rounded.Close, "Close scanner", tint = Color.White)
+                    }
+
+                    // Single vs Batch capture mode pill
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.6f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f))
+                    ) {
+                        Row(modifier = Modifier.padding(3.dp)) {
+                            listOf(true to "Batch", false to "Single").forEach { (isBatch, label) ->
+                                val selected = batchCaptureMode == isBatch
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(if (selected) TintScan else Color.Transparent)
+                                        .clickable { batchCaptureMode = isBatch }
+                                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (selected) Color(0xFF0A1F1F) else Color.White,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (hasCameraPerm && cameraAvailable && capabilities.hasFlashUnit) {
+                            IconButton(
+                                onClick = { torchEnabled = !torchEnabled },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.55f))
+                            ) {
+                                Icon(
+                                    imageVector = if (torchEnabled) Icons.Rounded.FlashlightOn else Icons.Rounded.FlashlightOff,
+                                    contentDescription = if (torchEnabled) "Turn torch off" else "Turn torch on",
+                                    tint = if (torchEnabled) BrandAmber else Color.White
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = { flashMode = flashMode.next() },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .testTag("scanner_flash_button")
+                        ) {
+                            Icon(
+                                imageVector = flashMode.icon,
+                                contentDescription = flashMode.label,
+                                tint = if (flashMode == FlashModeOption.ON) BrandAmber else Color.White
+                            )
+                        }
+                        if (hasCameraPerm && cameraAvailable && capabilities.hasBackCamera && capabilities.hasFrontCamera) {
+                            IconButton(
+                                onClick = {
+                                    useFrontCamera = !useFrontCamera
+                                    torchEnabled = false
+                                    zoomRatio = 1f
+                                },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.55f))
+                            ) {
+                                Icon(Icons.Rounded.Cameraswitch, "Switch camera", tint = Color.White)
                             }
                         }
                     }
                 }
 
-                // Auto edge-detection guide overlay
-                Canvas(modifier = Modifier.fillMaxSize().padding(horizontal = 36.dp, vertical = 128.dp)) {
-                    val corner = 32.dp.toPx()
-                    val stroke = Stroke(width = 3.5.dp.toPx())
-                    // Subtle bounding rect
-                    drawRect(color = TintScan.copy(alpha = 0.25f), style = Stroke(1.5.dp.toPx()))
-                    // 4 crisp teal edge brackets
-                    val w = size.width
-                    val h = size.height
-                    drawLine(TintScan, Offset(0f, 0f), Offset(corner, 0f), stroke.width)
-                    drawLine(TintScan, Offset(0f, 0f), Offset(0f, corner), stroke.width)
-                    drawLine(TintScan, Offset(w, 0f), Offset(w - corner, 0f), stroke.width)
-                    drawLine(TintScan, Offset(w, 0f), Offset(w, corner), stroke.width)
-                    drawLine(TintScan, Offset(0f, h), Offset(corner, h), stroke.width)
-                    drawLine(TintScan, Offset(0f, h), Offset(0f, h - corner), stroke.width)
-                    drawLine(TintScan, Offset(w, h), Offset(w - corner, h), stroke.width)
-                    drawLine(TintScan, Offset(w, h), Offset(w, h - corner), stroke.width)
-                }
-
-                // Top controls
-                Row(
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(16.dp)
-                ) {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.clip(CircleShape).background(Color.Black.copy(0.55f))
-                    ) { Icon(Icons.Rounded.Close, "Close scanner", tint = Color.White) }
-
-                    Surface(shape = CircleShape, color = Color.Black.copy(0.55f)) {
-                        Text("Auto edge detect", color = TintScan, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
-                    }
-
-                    IconButton(
-                        onClick = { flashOn = !flashOn },
-                        modifier = Modifier.clip(CircleShape).background(Color.Black.copy(0.55f))
-                    ) {
-                        Icon(if (flashOn) Icons.Rounded.FlashOn else Icons.Rounded.FlashOff, "Toggle flash", tint = if (flashOn) BrandAmber else Color.White)
-                    }
-                }
-
-                // Bottom camera controls (Gallery | Shutter | Batch counter)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                // Bottom overlay: optional zoom chip + hint + Gallery | Shutter | Batch stack
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(bottom = 26.dp, start = 20.dp, end = 20.dp)
+                        .padding(bottom = 22.dp, start = 20.dp, end = 20.dp)
                 ) {
-                    IconButton(
-                        onClick = { galleryImport.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                        modifier = Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(0.18f)).testTag("scanner_gallery_button")
-                    ) {
-                        Icon(Icons.Rounded.PhotoLibrary, "Import from gallery", tint = Color.White)
+                    if (hasCameraPerm && cameraAvailable && capabilities.maxZoomRatio >= 2f) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.55f),
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        ) {
+                            Row(modifier = Modifier.padding(3.dp)) {
+                                listOf(1f to "1x", 2f to "2x").forEach { (z, lbl) ->
+                                    val selected = (zoomRatio - z).let { it > -0.1f && it < 0.1f }
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(if (selected) Color.White.copy(alpha = 0.24f) else Color.Transparent)
+                                            .clickable { zoomRatio = z }
+                                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(lbl, color = Color.White, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+                        }
                     }
 
-                    // Shutter button
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(76.dp)
-                            .clip(CircleShape)
-                            .border(4.dp, Color.White, CircleShape)
-                            .padding(6.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(BrandCoral, BrandAmber)))
-                            .clickable {
-                                val cap = imageCapture
-                                if (hasCameraPerm && cameraAvailable && cap != null) {
+                    Text(
+                        text = if (batchCaptureMode) {
+                            "Tap preview to focus • Capture multiple pages, then tap count to create PDF"
+                        } else {
+                            "Tap preview to focus • Capture a page to crop & enhance"
+                        },
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 14.dp)
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // Gallery multi-photo import
+                        IconButton(
+                            onClick = {
+                                galleryImport.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            enabled = !isCapturing,
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.18f))
+                                .testTag("scanner_gallery_button")
+                        ) {
+                            Icon(Icons.Rounded.PhotoLibrary, "Import from gallery", tint = Color.White)
+                        }
+
+                        // CameraX Shutter button
+                        val shutterEnabled = hasCameraPerm && cameraAvailable && imageCapture != null && !isCapturing
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(CircleShape)
+                                .border(4.dp, Color.White.copy(alpha = if (shutterEnabled) 1f else 0.4f), CircleShape)
+                                .padding(6.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (shutterEnabled) {
+                                        Brush.linearGradient(listOf(BrandCoral, BrandAmber))
+                                    } else {
+                                        Brush.linearGradient(listOf(Color.Gray, Color.DarkGray))
+                                    }
+                                )
+                                .clickable(enabled = shutterEnabled) {
+                                    val cap = imageCapture ?: return@clickable
+                                    isCapturing = true
+                                    shutterFlash = true
+                                    viewModel.repository.scansDir.mkdirs()
                                     val outFile = File(viewModel.repository.scansDir, "cam_${System.currentTimeMillis()}.jpg")
                                     val opts = ImageCapture.OutputFileOptions.Builder(outFile).build()
                                     cap.takePicture(
                                         opts,
-                                        ContextCompat.getMainExecutor(context),
+                                        captureExecutor,
                                         object : ImageCapture.OnImageSavedCallback {
                                             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                                                workingRawFile = outFile
-                                                step = ScanStep.CROP
+                                                scope.launch {
+                                                    if (batchCaptureMode) {
+                                                        val page = autoEnhanceToPage(outFile)
+                                                        if (page != null) {
+                                                            batchPages = batchPages + page
+                                                        } else {
+                                                            snackbarHostState.showSnackbar("Failed to process captured photo.")
+                                                        }
+                                                        isCapturing = false
+                                                    } else {
+                                                        workingRawFile = outFile
+                                                        tl = Offset(0.06f, 0.06f); tr = Offset(0.94f, 0.06f)
+                                                        bl = Offset(0.06f, 0.94f); br = Offset(0.94f, 0.94f)
+                                                        cropRotation = 0f
+                                                        isCapturing = false
+                                                        step = ScanStep.CROP
+                                                    }
+                                                }
                                             }
+
                                             override fun onError(exception: ImageCaptureException) {
-                                                captureFallbackSamplePage()
+                                                scope.launch {
+                                                    isCapturing = false
+                                                    snackbarHostState.showSnackbar(
+                                                        "Capture failed: ${exception.message ?: "Camera error"}"
+                                                    )
+                                                }
                                             }
                                         }
                                     )
-                                } else {
-                                    captureFallbackSamplePage()
                                 }
+                                .testTag("scanner_shutter_button")
+                        ) {
+                            if (isCapturing) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    strokeWidth = 3.dp,
+                                    modifier = Modifier.size(28.dp)
+                                )
                             }
-                            .testTag("scanner_shutter_button")
-                    ) {}
+                        }
 
-                    // Batch counter badge
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (batchPages.isNotEmpty()) TintScan else Color.White.copy(0.18f))
-                            .clickable(enabled = batchPages.isNotEmpty()) { step = ScanStep.REVIEW }
-                    ) {
-                        Text(
-                            text = "${batchPages.size}",
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        // Batch page thumbnail stack & review trigger
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(58.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .border(
+                                    width = 2.dp,
+                                    color = if (batchPages.isNotEmpty()) TintScan else Color.White.copy(alpha = 0.28f),
+                                    shape = RoundedCornerShape(14.dp)
+                                )
+                                .background(Color.White.copy(alpha = 0.14f))
+                                .clickable(enabled = batchPages.isNotEmpty() && !isCapturing) {
+                                    step = ScanStep.REVIEW
+                                }
+                                .testTag("scanner_batch_review_button")
+                        ) {
+                            val latest = batchPages.lastOrNull()
+                            if (latest != null) {
+                                AsyncImage(
+                                    model = latest.processedFile,
+                                    contentDescription = "Review ${batchPages.size} captured pages",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(4.dp)
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(BrandCoral)
+                                ) {
+                                    Text(
+                                        text = "${batchPages.size}",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = "0",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
+                        }
                     }
                 }
+
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 128.dp)
+                )
             }
         }
 
         ScanStep.CROP -> {
-            val raw = workingRawFile
-            val rawBmp = remember(raw?.absolutePath, cropRotation) {
-                raw?.let { f ->
-                    PdfRenderHelper.decodeSampledBitmap(f, 1200)?.let {
-                        if (cropRotation != 0f) PdfRenderHelper.applyScanTransform(it, ScanFilter.ORIGINAL, rotationDegrees = cropRotation)
-                        else it
-                    }
-                }
-            }
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { Text("Crop page") },
-                        navigationIcon = { IconButton(onClick = { step = ScanStep.CAMERA }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
-                        actions = {
-                            TextButton(onClick = { step = ScanStep.FILTER }) { Text("Next") }
-                        }
-                    )
-                }
-            ) { padding ->
-                Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-                    BoxWithConstraints(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFF14111B))
-                    ) {
-                        val wPx = with(LocalDensity.current) { maxWidth.toPx() }.coerceAtLeast(1f)
-                        val hPx = with(LocalDensity.current) { maxHeight.toPx() }.coerceAtLeast(1f)
-                        rawBmp?.let {
-                            Image(it.asImageBitmap(), "Captured page", contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
-                        }
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val p = Path().apply {
-                                moveTo(tl.x * size.width, tl.y * size.height)
-                                lineTo(tr.x * size.width, tr.y * size.height)
-                                lineTo(br.x * size.width, br.y * size.height)
-                                lineTo(bl.x * size.width, bl.y * size.height)
-                                close()
-                            }
-                            drawPath(p, TintScan, style = Stroke(3.dp.toPx()))
-                        }
-                        CropCornerHandle(tl, wPx, hPx) { tl = it }
-                        CropCornerHandle(tr, wPx, hPx) { tr = it }
-                        CropCornerHandle(bl, wPx, hPx) { bl = it }
-                        CropCornerHandle(br, wPx, hPx) { br = it }
-                    }
-
-                    Spacer(Modifier.height(14.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth().navigationBarsPadding()
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                tl = Offset(0f, 0f); tr = Offset(1f, 0f)
-                                bl = Offset(0f, 1f); br = Offset(1f, 1f)
-                            },
-                            shape = CircleShape,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Rounded.CropFree, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Full page", maxLines = 1)
-                        }
-                        OutlinedButton(
-                            onClick = {
-                                tl = Offset(0.08f, 0.08f); tr = Offset(0.92f, 0.08f)
-                                bl = Offset(0.08f, 0.92f); br = Offset(0.92f, 0.92f)
-                            },
-                            shape = CircleShape,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Rounded.AutoFixHigh, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Auto", maxLines = 1)
-                        }
-                        OutlinedButton(
-                            onClick = { cropRotation = (cropRotation + 90f) % 360f },
-                            shape = CircleShape,
-                            modifier = Modifier.weight(0.9f)
-                        ) {
-                            Icon(Icons.AutoMirrored.Rounded.RotateRight, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Rotate")
-                        }
-                    }
-                }
-            }
+            ScanCropStep(
+                rawFile = workingRawFile,
+                cropRotation = cropRotation,
+                tl = tl,
+                tr = tr,
+                bl = bl,
+                br = br,
+                onUpdateCorners = { nTl, nTr, nBl, nBr ->
+                    tl = nTl; tr = nTr; bl = nBl; br = nBr
+                },
+                onRotate = { cropRotation = (cropRotation + 90f) % 360f },
+                onBack = { step = ScanStep.CAMERA },
+                onNext = { step = ScanStep.FILTER }
+            )
         }
 
         ScanStep.FILTER -> {
-            val raw = workingRawFile
-            val filteredBmp = remember(raw?.absolutePath, selectedFilter, brightness, contrast, cropRotation, tl, tr, bl, br) {
-                raw?.let { f ->
-                    PdfRenderHelper.decodeSampledBitmap(f, 1100)?.let { src ->
-                        PdfRenderHelper.applyScanTransform(
-                            src = src,
-                            filter = selectedFilter,
-                            brightness = brightness,
-                            contrast = contrast,
-                            rotationDegrees = cropRotation,
-                            cropLeft = minOf(tl.x, bl.x),
-                            cropTop = minOf(tl.y, tr.y),
-                            cropRight = maxOf(tr.x, br.x),
-                            cropBottom = maxOf(bl.y, br.y)
-                        )
+            ScanFilterStep(
+                rawFile = workingRawFile,
+                cropRotation = cropRotation,
+                tl = tl,
+                tr = tr,
+                bl = bl,
+                br = br,
+                selectedFilter = selectedFilter,
+                brightness = brightness,
+                contrast = contrast,
+                isSavingPage = isSavingPage,
+                onFilterChange = { selectedFilter = it },
+                onBrightnessChange = { brightness = it },
+                onContrastChange = { contrast = it },
+                onBack = { step = ScanStep.CROP },
+                onKeepPage = { bmp ->
+                    val raw = workingRawFile ?: return@ScanFilterStep
+                    isSavingPage = true
+                    scope.launch {
+                        val out = withContext(Dispatchers.IO) {
+                            viewModel.repository.scansDir.mkdirs()
+                            val file = File(viewModel.repository.scansDir, "processed_${System.currentTimeMillis()}.jpg")
+                            FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+                            file
+                        }
+                        batchPages = batchPages + CapturedScanPage(raw, out, selectedFilter, brightness, contrast, cropRotation)
+                        isSavingPage = false
+                        step = ScanStep.REVIEW
                     }
                 }
-            }
-
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { Text("Enhance & Filter") },
-                        navigationIcon = { IconButton(onClick = { step = ScanStep.CROP }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
-                        actions = {
-                            Button(
-                                onClick = {
-                                    if (raw != null && filteredBmp != null) {
-                                        val out = File(viewModel.repository.scansDir, "processed_${System.currentTimeMillis()}.jpg")
-                                        FileOutputStream(out).use { filteredBmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                                        batchPages = batchPages + CapturedScanPage(raw, out, selectedFilter, brightness, contrast, cropRotation)
-                                        step = ScanStep.REVIEW
-                                    }
-                                },
-                                shape = CircleShape,
-                                modifier = Modifier.padding(end = 8.dp)
-                            ) {
-                                Icon(Icons.Rounded.Check, null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Keep")
-                            }
-                        }
-                    )
-                }
-            ) { padding ->
-                Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFF14111B))
-                    ) {
-                        filteredBmp?.let {
-                            Image(it.asImageBitmap(), "Filtered scan preview", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(ScanFilter.entries) { f ->
-                            FilterChip(
-                                selected = selectedFilter == f,
-                                onClick = { selectedFilter = f },
-                                label = { Text(f.label) }
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text("Brightness", style = MaterialTheme.typography.labelMedium)
-                    Slider(value = brightness, onValueChange = { brightness = it }, valueRange = -0.35f..0.35f)
-                    Text("Contrast", style = MaterialTheme.typography.labelMedium)
-                    Slider(
-                        value = contrast,
-                        onValueChange = { contrast = it },
-                        valueRange = 0.6f..1.8f,
-                        modifier = Modifier.navigationBarsPadding()
-                    )
-                }
-            }
+            )
         }
 
         ScanStep.REVIEW -> {
-            val langs = listOf("English", "Spanish", "French", "German", "Hindi", "Japanese")
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { Text("Review (${batchPages.size} page${if (batchPages.size == 1) "" else "s"})") },
-                        navigationIcon = { IconButton(onClick = { step = ScanStep.CAMERA }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } }
+            ScanReviewStep(
+                batchPages = batchPages,
+                pdfTitle = pdfTitle,
+                pageSize = pageSize,
+                margin = pageMargin,
+                enableOcr = enableOcr,
+                ocrLang = ocrLang,
+                isCreatingPdf = isCreatingPdf,
+                onPdfTitleChange = { pdfTitle = it },
+                onPageSizeChange = { pageSize = it },
+                onMarginChange = { pageMargin = it },
+                onToggleOcr = { enableOcr = it },
+                onOcrLangChange = { ocrLang = it },
+                onMovePage = { from, to ->
+                    if (from in batchPages.indices && to in batchPages.indices) {
+                        val mutable = batchPages.toMutableList()
+                        val moved = mutable.removeAt(from)
+                        mutable.add(to, moved)
+                        batchPages = mutable
+                    }
+                },
+                onDeletePage = { idx ->
+                    batchPages = batchPages.filterIndexed { i, _ -> i != idx }
+                },
+                onAddMorePages = { step = ScanStep.CAMERA },
+                onCreatePdf = {
+                    isCreatingPdf = true
+                    viewModel.saveScannedBatchToPdf(
+                        pageFiles = batchPages.map { it.processedFile },
+                        filterNames = batchPages.map { it.filter.label },
+                        enableOcr = enableOcr,
+                        ocrLang = ocrLang,
+                        pdfTitle = pdfTitle,
+                        pageSize = pageSize,
+                        margin = pageMargin,
+                        onCreated = { createdDoc ->
+                            isCreatingPdf = false
+                            onPdfCreated(createdDoc)
+                        },
+                        onError = { msg ->
+                            isCreatingPdf = false
+                            scope.launch { snackbarHostState.showSnackbar(msg) }
+                        }
                     )
                 }
-            ) { padding ->
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp).navigationBarsPadding()
-                ) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        itemsIndexed(batchPages) { idx, page ->
-                            Surface(
-                                shape = RoundedCornerShape(18.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                border = BorderStroke(1.dp, LocalPaperPilotColors.current.subtleBorder),
-                                modifier = Modifier.width(210.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    AsyncImage(
-                                        model = page.processedFile,
-                                        contentDescription = "Scanned page ${idx + 1}",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        IconButton(
-                                            onClick = {
-                                                if (idx > 0) {
-                                                    val m = batchPages.toMutableList()
-                                                    val it = m.removeAt(idx)
-                                                    m.add(idx - 1, it)
-                                                    batchPages = m
-                                                }
-                                            },
-                                            enabled = idx > 0
-                                        ) { Icon(Icons.Rounded.ArrowBackIosNew, "Move left", modifier = Modifier.size(16.dp)) }
-                                        Text("Page ${idx + 1}", style = MaterialTheme.typography.labelMedium)
-                                        IconButton(
-                                            onClick = {
-                                                if (idx < batchPages.lastIndex) {
-                                                    val m = batchPages.toMutableList()
-                                                    val it = m.removeAt(idx)
-                                                    m.add(idx + 1, it)
-                                                    batchPages = m
-                                                }
-                                            },
-                                            enabled = idx < batchPages.lastIndex
-                                        ) { Icon(Icons.Rounded.ArrowForwardIos, "Move right", modifier = Modifier.size(16.dp)) }
-                                        IconButton(
-                                            onClick = { batchPages = batchPages.filterIndexed { i, _ -> i != idx } }
-                                        ) { Icon(Icons.Rounded.Delete, "Delete page", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("OCR (make text searchable)", style = MaterialTheme.typography.titleSmall)
-                            Text("Index scanned pages locally in $ocrLang", style = MaterialTheme.typography.bodySmall, color = LocalPaperPilotColors.current.mutedText)
-                        }
-                        Switch(checked = enableOcr, onCheckedChange = { enableOcr = it })
-                    }
-
-                    if (enableOcr) {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(langs) { l ->
-                                FilterChip(selected = ocrLang == l, onClick = { ocrLang = l }, label = { Text(l) })
-                            }
-                        }
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = { step = ScanStep.CAMERA },
-                            shape = CircleShape,
-                            modifier = Modifier.weight(1f).height(50.dp)
-                        ) {
-                            Icon(Icons.Rounded.Add, null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Add page")
-                        }
-                        Button(
-                            onClick = {
-                                viewModel.saveScannedBatchToPdf(
-                                    pageFiles = batchPages.map { it.processedFile },
-                                    filterNames = batchPages.map { it.filter.label },
-                                    enableOcr = enableOcr,
-                                    ocrLang = ocrLang,
-                                    onCreated = onPdfCreated
-                                )
-                            },
-                            enabled = batchPages.isNotEmpty(),
-                            shape = CircleShape,
-                            modifier = Modifier.weight(1.4f).height(50.dp).testTag("scanner_create_pdf_button")
-                        ) {
-                            Text("Create PDF")
-                        }
-                    }
-                }
-            }
+            )
         }
-    }
-}
-
-@Composable
-private fun CropCornerHandle(
-    position: Offset,
-    widthPx: Float,
-    heightPx: Float,
-    onMove: (Offset) -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .offset {
-                IntOffset(
-                    (position.x * widthPx - 18.dp.toPx()).roundToInt(),
-                    (position.y * heightPx - 18.dp.toPx()).roundToInt()
-                )
-            }
-            .size(36.dp)
-            .pointerInput(position) {
-                detectDragGestures { change, drag ->
-                    change.consume()
-                    onMove(
-                        Offset(
-                            (position.x + drag.x / widthPx).coerceIn(0f, 1f),
-                            (position.y + drag.y / heightPx).coerceIn(0f, 1f)
-                        )
-                    )
-                }
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(BrandCoral)
-                .border(2.5.dp, Color.White, CircleShape)
-        )
     }
 }

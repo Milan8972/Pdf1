@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        (request.auth.token.email_verified == true &&
+         request.auth.token.email == 'milanmoondal@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidFreeUserCreate(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.planTier == 'FREE' &&
+             data.priceInr == 0 &&
+             data.currency == 'INR' &&
+             data.membershipStatus == 'NONE' &&
+             data.premiumUntilEpochMs == 0 &&
+             data.autoRenew == false &&
+             data.paymentProvider == '' &&
+             data.lastTransactionId == '' &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidProfileContactUpdate(data) {
+      return data.userId == existing().userId &&
+             data.createdAt == existing().createdAt &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time &&
+             // Clients can NEVER self-upgrade membership or tamper with payment fields
+             data.planTier == existing().planTier &&
+             data.priceInr == existing().priceInr &&
+             data.currency == existing().currency &&
+             data.membershipStatus == existing().membershipStatus &&
+             data.premiumUntilEpochMs == existing().premiumUntilEpochMs &&
+             data.autoRenew == existing().autoRenew &&
+             data.paymentProvider == existing().paymentProvider &&
+             data.lastTransactionId == existing().lastTransactionId;
+    }
+
+    // Admin registry (read-only self-check; managed strictly via backend / Firebase Admin SDK)
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+
+    // Users collection: owner reads own doc, admins can inspect for Admin Dashboard.
+    // Clients can ONLY initialize a FREE profile or update email/displayName.
+    // Paid membership activation/renewal/cancellation/expiry is strictly server-side (Admin SDK).
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().keys().hasAll([
+                         'userId', 'email', 'displayName', 'planTier', 'priceInr', 'currency',
+                         'membershipStatus', 'premiumUntilEpochMs', 'autoRenew',
+                         'paymentProvider', 'lastTransactionId', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'email', 'displayName', 'planTier', 'priceInr', 'currency',
+                         'membershipStatus', 'premiumUntilEpochMs', 'autoRenew',
+                         'paymentProvider', 'lastTransactionId', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidFreeUserCreate(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       isValidProfileContactUpdate(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'email', 'displayName', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    // Memberships collection: strictly written by server-side Admin SDK after verified payment
+    match /memberships/{membershipId} {
+      allow get, list: if isSignedIn() && (
+        isAdmin() || resource.data.userId == request.auth.uid
+      );
+      allow create, update, delete: if false;
+    }
+
+    // Payments collection: strictly written by server-side Admin SDK after verified signature/Play Billing check
+    match /payments/{paymentId} {
+      allow get, list: if isSignedIn() && (
+        isAdmin() || resource.data.userId == request.auth.uid
+      );
+      allow create, update, delete: if false;
+    }
+
+    // Orders collection: strictly written by server-side Admin SDK via /api/orders/create
+    match /orders/{orderId} {
+      allow get, list: if isSignedIn() && (
+        isAdmin() || resource.data.userId == request.auth.uid
+      );
+      allow create, update, delete: if false;
+    }
+
+    // Refunds collection: strictly written by server-side Admin SDK via webhook or admin refund endpoint
+    match /refunds/{refundId} {
+      allow get, list: if isSignedIn() && (
+        isAdmin() || resource.data.userId == request.auth.uid
+      );
+      allow create, update, delete: if false;
+    }
+  }
+}

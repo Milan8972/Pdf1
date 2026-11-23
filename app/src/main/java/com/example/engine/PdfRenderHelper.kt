@@ -170,20 +170,24 @@ object PdfRenderHelper {
         cropRight: Float = 1f,
         cropBottom: Float = 1f
     ): Bitmap {
-        val x = (src.width * cropLeft.coerceIn(0f, 0.9f)).roundToInt()
-        val y = (src.height * cropTop.coerceIn(0f, 0.9f)).roundToInt()
-        val w = (src.width * (cropRight - cropLeft).coerceIn(0.1f, 1f)).roundToInt()
-            .coerceAtMost(src.width - x).coerceAtLeast(1)
-        val h = (src.height * (cropBottom - cropTop).coerceIn(0.1f, 1f)).roundToInt()
-            .coerceAtMost(src.height - y).coerceAtLeast(1)
-
-        val cropped = Bitmap.createBitmap(src, x, y, w, h)
-        val rotated = if (rotationDegrees % 360f != 0f) {
+        val oriented = if (rotationDegrees % 360f != 0f) {
             val matrix = Matrix().apply { postRotate(rotationDegrees) }
-            Bitmap.createBitmap(cropped, 0, 0, cropped.width, cropped.height, matrix, true)
-        } else cropped
+            Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+        } else src
 
-        val out = Bitmap.createBitmap(rotated.width, rotated.height, Bitmap.Config.ARGB_8888)
+        val x = (oriented.width * cropLeft.coerceIn(0f, 0.9f)).roundToInt()
+        val y = (oriented.height * cropTop.coerceIn(0f, 0.9f)).roundToInt()
+        val w = (oriented.width * (cropRight - cropLeft).coerceIn(0.1f, 1f)).roundToInt()
+            .coerceAtMost(oriented.width - x).coerceAtLeast(1)
+        val h = (oriented.height * (cropBottom - cropTop).coerceIn(0.1f, 1f)).roundToInt()
+            .coerceAtMost(oriented.height - y).coerceAtLeast(1)
+
+        val cropped = Bitmap.createBitmap(oriented, x, y, w, h)
+        if (oriented !== src && oriented !== cropped) {
+            oriented.recycle()
+        }
+
+        val out = Bitmap.createBitmap(cropped.width, cropped.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         val cm = ColorMatrix()
 
@@ -213,7 +217,10 @@ object PdfRenderHelper {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             colorFilter = ColorMatrixColorFilter(cm)
         }
-        canvas.drawBitmap(rotated, 0f, 0f, paint)
+        canvas.drawBitmap(cropped, 0f, 0f, paint)
+        if (cropped !== src) {
+            cropped.recycle()
+        }
         return out
     }
 
@@ -233,13 +240,48 @@ object PdfRenderHelper {
         if (!file.exists()) return null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
         var sampleSize = 1
         val maxSide = max(bounds.outWidth, bounds.outHeight)
         while (maxSide / sampleSize > maxDimension) {
             sampleSize *= 2
         }
         val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        return BitmapFactory.decodeFile(file.absolutePath, opts)
+        val decoded = BitmapFactory.decodeFile(file.absolutePath, opts) ?: return null
+        return applyExifOrientation(file, decoded)
+    }
+
+    private fun applyExifOrientation(file: File, bitmap: Bitmap): Bitmap {
+        val orientation = runCatching {
+            android.media.ExifInterface(file.absolutePath)
+                .getAttributeInt(
+                    android.media.ExifInterface.TAG_ORIENTATION,
+                    android.media.ExifInterface.ORIENTATION_NORMAL
+                )
+        }.getOrDefault(android.media.ExifInterface.ORIENTATION_NORMAL)
+
+        val matrix = Matrix()
+        when (orientation) {
+            android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            android.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+            android.media.ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+            android.media.ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.postRotate(90f)
+                matrix.postScale(-1f, 1f)
+            }
+            android.media.ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.postRotate(270f)
+                matrix.postScale(-1f, 1f)
+            }
+            else -> return bitmap
+        }
+        return runCatching {
+            val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            if (rotated !== bitmap) bitmap.recycle()
+            rotated
+        }.getOrDefault(bitmap)
     }
 
     fun formatFileSize(bytes: Long): String {

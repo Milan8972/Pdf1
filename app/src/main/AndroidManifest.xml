@@ -9,6 +9,16 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+    <!-- Opt out of Privacy Sandbox AdServices APIs to prevent MEASUREMENT_SERVICE onNullBinding errors on devices/emulators without AdServices enabled -->
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_TOPICS"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+        tools:node="remove" />
 
     <application
         android:allowBackup="true"
@@ -23,6 +33,15 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3940256099942544~3347511713" />
+        <meta-data
+            android:name="com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
+            android:value="true" />
+        <meta-data
+            android:name="com.google.android.gms.ads.flag.OPTIMIZE_AD_LOADING"
+            android:value="true" />
+        <property
+            android:name="android.adservices.AD_SERVICES_CONFIG"
+            tools:node="remove" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

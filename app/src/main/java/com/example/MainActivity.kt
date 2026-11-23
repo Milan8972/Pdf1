@@ -53,9 +53,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.credentials.CredentialManager
 import com.example.ads.AdMobBannerBar
 import com.example.ads.AdMobManager
 import com.example.ads.findActivity
+import com.example.auth.attemptAutoGoogleSignIn
 import com.example.data.DocumentEntity
 import com.example.data.DocumentSource
 import com.example.model.ToolId
@@ -67,6 +69,7 @@ import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.OnboardingScreen
 import com.example.ui.screens.PdfEditorScreen
 import com.example.ui.screens.PdfViewerScreen
+import com.example.ui.screens.PremiumMembershipScreen
 import com.example.ui.screens.ScannerFlowScreen
 import com.example.ui.screens.ScannerTabLanding
 import com.example.ui.screens.SettingsScreen
@@ -74,24 +77,39 @@ import com.example.ui.screens.TemplatesPickerScreen
 import com.example.ui.screens.ToolFlowScreen
 import com.example.ui.screens.ToolsScreen
 import com.example.ui.theme.PaperPilotTheme
+import com.example.payment.PaymentManager
 import com.example.viewmodel.AppDestination
 import com.example.viewmodel.MainTab
 import com.example.viewmodel.PaperPilotViewModel
 import com.google.android.gms.ads.MobileAds
+import com.razorpay.PaymentData
+import com.razorpay.PaymentResultWithDataListener
+import androidx.compose.runtime.rememberCoroutineScope
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     private var wentToBackground = false
+    private lateinit var paymentManager: PaymentManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        paymentManager = PaymentManager(applicationContext)
+        paymentManager.initialize()
         AdMobManager.configureTestDevices()
         MobileAds.initialize(this) {
             AdMobManager.onMobileAdsInitialized(this)
         }
         enableEdgeToEdge()
         setContent {
-            PaperPilotApp()
+            PaperPilotApp(paymentManager = paymentManager)
         }
+    }
+
+    override fun onPaymentSuccess(razorpayPaymentID: String?, paymentData: PaymentData?) {
+        PaymentManager.handlePaymentSuccess(razorpayPaymentID, paymentData)
+    }
+
+    override fun onPaymentError(code: Int, response: String?, paymentData: PaymentData?) {
+        PaymentManager.handlePaymentError(code, response, paymentData)
     }
 
     override fun onStop() {
@@ -109,7 +127,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
+fun PaperPilotApp(
+    paymentManager: PaymentManager? = null,
+    viewModel: PaperPilotViewModel = viewModel()
+) {
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val documents by viewModel.documents.collectAsStateWithLifecycle()
@@ -120,9 +141,24 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
     val backStack by viewModel.backStack.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoadingInitial.collectAsStateWithLifecycle()
     val passwordPromptDoc by viewModel.passwordPromptDoc.collectAsStateWithLifecycle()
+    val membershipState by viewModel.membershipState.collectAsStateWithLifecycle()
+    val paymentFlowState by viewModel.paymentFlowState.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val pendingImportSource = remember { androidx.compose.runtime.mutableStateOf(DocumentSource.OPENED) }
+    val authScope = rememberCoroutineScope()
+    val credentialManager = remember(context) { CredentialManager.create(context) }
+
+    // Silent auto sign-in for returning Google Premium members (non-blocking for free users)
+    LaunchedEffect(Unit) {
+        attemptAutoGoogleSignIn(
+            context = context,
+            credentialManager = credentialManager,
+            scope = authScope,
+            onAuthSuccess = { viewModel.onGoogleAuthSucceeded() },
+            onUnauthenticated = { /* Free ad-supported users do not need to sign in */ }
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarEvents.collect { event ->
@@ -195,13 +231,57 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
                         )
                     }
 
+                    AppDestination.PremiumMembership -> {
+                        PremiumMembershipScreen(
+                            membershipState = membershipState,
+                            paymentFlowState = paymentFlowState,
+                            paymentManager = paymentManager,
+                            onBack = { viewModel.navigateBack() },
+                            onGoogleAuthSucceeded = { viewModel.onGoogleAuthSucceeded() },
+                            onBeforeSignOut = { viewModel.clearMembershipListenerBeforeSignOut() },
+                            onSignOutCompleted = { viewModel.onSignOutCompleted() },
+                            onSetStep = { step -> viewModel.setPaymentStep(step) },
+                            onSelectPlan = { plan -> viewModel.selectMembershipPlan(plan) },
+                            onSelectAutoPayTargetPlan = { plan -> viewModel.selectAutoPayTargetPlan(plan) },
+                            onSelectMethod = { method -> viewModel.selectPaymentMethod(method) },
+                            onStartCheckout = {
+                                viewModel.startVerifiedPaymentFlow(
+                                    activity = context.findActivity(),
+                                    customPaymentManager = paymentManager
+                                )
+                            },
+                            onTriggerRazorpayOrder = { plan, mgr ->
+                                viewModel.startRazorpayOrderForPlan(
+                                    activity = context.findActivity(),
+                                    plan = plan,
+                                    customPaymentManager = mgr
+                                )
+                            },
+                            onStartTrialAutoPay = { targetPlan, mgr ->
+                                viewModel.startTrialAutoPayFlow(
+                                    activity = context.findActivity(),
+                                    targetPlan = targetPlan,
+                                    customPaymentManager = mgr
+                                )
+                            },
+                            onToggleAutoPay = { enabled -> viewModel.toggleAutoPay(enabled) },
+                            onRestorePurchases = { viewModel.restorePurchases() },
+                            onCancelSubscription = { reason -> viewModel.cancelPremiumSubscription(reason) },
+                            onRefreshAdmin = { viewModel.refreshAdminDashboard() },
+                            onNotify = { msg -> viewModel.emitMessage(msg) }
+                        )
+                    }
+
                     AppDestination.ScannerCamera -> {
                         ScannerFlowScreen(
                             viewModel = viewModel,
                             defaultOcrLang = settings.ocrLanguage,
                             onBack = { viewModel.navigateBack() },
                             onPdfCreated = { created ->
-                                AdMobManager.showInterstitialIfReady(context.findActivity()) {
+                                AdMobManager.showRewardedInterstitialIfReady(context.findActivity()) { earned ->
+                                    if (earned && !membershipState.isPremiumActive) {
+                                        viewModel.emitMessage("Bonus unlocked: 15 min ad-free!")
+                                    }
                                     viewModel.popToMainTabs(MainTab.SCAN)
                                     viewModel.openDocument(created, bypassPassword = true)
                                 }
@@ -277,6 +357,8 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
                                     documents = documents,
                                     quickTools = viewModel.getQuickTools(),
                                     isLoading = isLoading,
+                                    isPremiumActive = membershipState.isPremiumActive,
+                                    onOpenPremium = { viewModel.navigateTo(AppDestination.PremiumMembership) },
                                     onOpenDocument = { viewModel.openDocument(it) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onOpenTool = { viewModel.openTool(it) },
@@ -334,6 +416,16 @@ fun PaperPilotApp(viewModel: PaperPilotViewModel = viewModel()) {
 
                                 MainTab.SETTINGS -> SettingsScreen(
                                     settings = settings,
+                                    membershipState = membershipState,
+                                    onOpenPremium = { viewModel.navigateTo(AppDestination.PremiumMembership) },
+                                    onWatchRewardedAd = {
+                                        AdMobManager.showRewardedAd(
+                                            activity = context.findActivity(),
+                                            onRewardEarned = { viewModel.emitMessage("Reward unlocked! Ads paused for 30 minutes.") },
+                                            onUnavailable = { msg -> viewModel.emitMessage(msg) },
+                                            onDismissed = { viewModel.emitMessage("Watch the full ad to unlock 30 min ad-free.") }
+                                        )
+                                    },
                                     onSetThemeMode = viewModel::setThemeMode,
                                     onSetAccentPreset = viewModel::setAccentPreset,
                                     onSetDefaultSaveFolder = viewModel::setDefaultSaveFolder,

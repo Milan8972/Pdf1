@@ -1,21 +1,17 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ProGuard / R8 rules for PaperPilot — All-in-One PDF Editor
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Razorpay Android Checkout SDK keep rules
+-keepattributes *Annotation*
+-dontwarn com.razorpay.**
+-keep class com.razorpay.** { *; }
+-optimizations !method/inlining/*
+-keepclasseswithmembers class * {
+  public void onPayment*(...);
+}
+-keepclassmembers class * implements com.razorpay.PaymentResultWithDataListener {
+  public void onPaymentSuccess(java.lang.String, com.razorpay.PaymentData);
+  public void onPaymentError(int, java.lang.String, com.razorpay.PaymentData);
+}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
-
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Firebase Firestore @Keep models
+-keep @androidx.annotation.Keep class * { *; }

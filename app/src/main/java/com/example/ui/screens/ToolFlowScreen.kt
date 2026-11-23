@@ -521,7 +521,23 @@ fun ToolFlowScreen(
                                             outputResult = res
                                             outputDoc = saved
                                             step = ToolStep.RESULT
-                                            AdMobManager.showInterstitialIfReady(context.findActivity())
+                                            val isHeavyTool = toolId in setOf(
+                                                ToolId.MERGE,
+                                                ToolId.OCR,
+                                                ToolId.IMAGE_TO_PDF,
+                                                ToolId.PDF_TO_WORD,
+                                                ToolId.PDF_TO_EXCEL,
+                                                ToolId.PDF_TO_PPT
+                                            )
+                                            if (isHeavyTool) {
+                                                AdMobManager.showRewardedInterstitialIfReady(context.findActivity()) { earned ->
+                                                    if (earned && !AdMobManager.isPremiumActive.value) {
+                                                        viewModel.emitMessage("Bonus unlocked: 15 min ad-free!")
+                                                    }
+                                                }
+                                            } else {
+                                                AdMobManager.showInterstitialIfReady(context.findActivity())
+                                            }
                                         },
                                         onError = { err ->
                                             if (err == "Cancelled") step = ToolStep.OPTIONS

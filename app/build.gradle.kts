@@ -20,6 +20,10 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // Public non-secret backend base URL (private payment secrets stay exclusively on the Node.js server)
+    buildConfigField("String", "PAYMENT_BACKEND_BASE_URL", "\"\"")
+    buildConfigField("String", "RAZORPAY_PUBLIC_KEY_ID", "\"\"")
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
@@ -100,7 +104,7 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 // This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
-  // implementation(platform(libs.firebase.bom))
+  implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.camera.camera2)
@@ -124,20 +128,22 @@ dependencies {
   implementation(libs.coil.compose)
   // implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
-  // implementation(libs.firebase.firestore)
-  // implementation(libs.firebase.auth)
-  // implementation(libs.androidx.credentials)
-  // implementation(libs.androidx.credentials.play.services)
-  // implementation(libs.googleid)
+  implementation(libs.firebase.firestore)
+  implementation(libs.firebase.auth)
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services)
+  implementation(libs.googleid)
   // implementation(libs.firebase.appcheck.recaptcha)
   // implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   // implementation(libs.logging.interceptor)
   // implementation(libs.moshi.kotlin)
-  // implementation(libs.okhttp)
+  implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.play.services.ads)
+  implementation(libs.play.billing.ktx)
+  implementation(libs.razorpay.checkout)
   // implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)

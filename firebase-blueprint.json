@@ -1,0 +1,149 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Google-authenticated PaperPilot user profile with server-synced Premium membership summary (₹99/month or ₹999/year).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "planTier": { "type": "string", "enum": ["FREE", "MONTHLY_99", "YEARLY_999"] },
+        "priceInr": { "type": "integer", "enum": [0, 99, 999] },
+        "currency": { "type": "string", "enum": ["INR"] },
+        "membershipStatus": { "type": "string", "enum": ["NONE", "ACTIVE", "CANCELLED", "EXPIRED", "REFUNDED"] },
+        "premiumUntilEpochMs": { "type": "integer" },
+        "autoRenew": { "type": "boolean" },
+        "paymentProvider": { "type": "string" },
+        "lastTransactionId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "email", "displayName", "planTier", "priceInr", "currency",
+        "membershipStatus", "premiumUntilEpochMs", "autoRenew",
+        "paymentProvider", "lastTransactionId", "createdAt", "updatedAt"
+      ]
+    },
+    "MembershipRecord": {
+      "title": "MembershipRecord",
+      "description": "Server-verified active/historical PaperPilot Premium subscription record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "planTier": { "type": "string", "enum": ["MONTHLY_99", "YEARLY_999"] },
+        "amountInr": { "type": "integer", "enum": [99, 999] },
+        "currency": { "type": "string", "enum": ["INR"] },
+        "paymentProvider": { "type": "string", "enum": ["GOOGLE_PLAY", "RAZORPAY"] },
+        "transactionId": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "CANCELLED", "EXPIRED", "REFUNDED"] },
+        "purchaseDateMs": { "type": "integer" },
+        "expiryDateMs": { "type": "integer" },
+        "renewalStatus": { "type": "string", "enum": ["AUTO_RENEW", "CANCELLED_AT_PERIOD_END", "EXPIRED", "REVOKED"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "planTier", "amountInr", "currency", "paymentProvider",
+        "transactionId", "status", "purchaseDateMs", "expiryDateMs",
+        "renewalStatus", "createdAt", "updatedAt"
+      ]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "Server-verified payment transaction and receipt record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "planTier": { "type": "string", "enum": ["MONTHLY_99", "YEARLY_999"] },
+        "amountInr": { "type": "integer", "enum": [99, 999] },
+        "currency": { "type": "string", "enum": ["INR"] },
+        "paymentProvider": { "type": "string", "enum": ["GOOGLE_PLAY", "RAZORPAY"] },
+        "paymentMethod": { "type": "string" },
+        "status": { "type": "string", "enum": ["SUCCESS", "FAILED", "CANCELLED", "REFUNDED", "PENDING"] },
+        "purchaseDateMs": { "type": "integer" },
+        "expiryDateMs": { "type": "integer" },
+        "receiptNumber": { "type": "string" },
+        "failureReason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "orderId", "transactionId", "planTier", "amountInr", "currency",
+        "paymentProvider", "paymentMethod", "status", "purchaseDateMs", "expiryDateMs",
+        "receiptNumber", "createdAt", "updatedAt"
+      ]
+    },
+    "OrderRecord": {
+      "title": "OrderRecord",
+      "description": "Server-created payment order record with idempotency protection.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "providerOrderId": { "type": "string" },
+        "planTier": { "type": "string", "enum": ["MONTHLY_99", "YEARLY_999"] },
+        "amountInr": { "type": "integer", "enum": [99, 999] },
+        "amountPaise": { "type": "integer", "enum": [9900, 99900] },
+        "currency": { "type": "string", "enum": ["INR"] },
+        "paymentProvider": { "type": "string", "enum": ["GOOGLE_PLAY", "RAZORPAY"] },
+        "status": { "type": "string", "enum": ["CREATED", "PAID", "FAILED", "CANCELLED"] },
+        "idempotencyKey": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "orderId", "planTier", "amountInr", "amountPaise",
+        "currency", "paymentProvider", "status", "idempotencyKey", "createdAt", "updatedAt"
+      ]
+    },
+    "RefundRecord": {
+      "title": "RefundRecord",
+      "description": "Server-processed refund and membership revocation record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "paymentId": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "refundId": { "type": "string" },
+        "amountInr": { "type": "integer", "enum": [99, 999] },
+        "currency": { "type": "string", "enum": ["INR"] },
+        "paymentProvider": { "type": "string", "enum": ["GOOGLE_PLAY", "RAZORPAY"] },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["PROCESSED", "PENDING", "FAILED"] },
+        "processedAtMs": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "paymentId", "transactionId", "refundId", "amountInr",
+        "currency", "paymentProvider", "reason", "status", "processedAtMs",
+        "createdAt", "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Per-user profile and cached Premium membership state. Clients may only create FREE profiles and update email/displayName; paid upgrades are written strictly by the verified payment backend."
+    },
+    "/memberships/{membershipId}": {
+      "schema": { "$ref": "#/entities/MembershipRecord" },
+      "description": "Authoritative server-verified subscription records. Read-only for owning user and admins; server writes only."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/PaymentRecord" },
+      "description": "Verified payment transactions and receipts. Read-only for owning user and admins; server writes only."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/OrderRecord" },
+      "description": "Server-generated payment orders with idempotency protection. Read-only for owning user and admins; server writes only."
+    },
+    "/refunds/{refundId}": {
+      "schema": { "$ref": "#/entities/RefundRecord" },
+      "description": "Processed refund records. Read-only for owning user and admins; server writes only."
+    }
+  }
+}

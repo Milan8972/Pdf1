@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.UploadFile
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -81,6 +82,8 @@ fun HomeScreen(
     documents: List<DocumentEntity>,
     quickTools: List<ToolId>,
     isLoading: Boolean,
+    isPremiumActive: Boolean = false,
+    onOpenPremium: () -> Unit = {},
     onOpenDocument: (DocumentEntity) -> Unit,
     onToggleFavorite: (DocumentEntity) -> Unit,
     onOpenTool: (ToolId) -> Unit,
@@ -129,7 +132,32 @@ fun HomeScreen(
                         .padding(horizontal = 20.dp, vertical = 14.dp)
                 ) {
                     PaperPilotLogo(size = 32.dp, variant = LogoVariant.FULL)
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            onClick = onOpenPremium,
+                            shape = CircleShape,
+                            color = if (isPremiumActive) TintScan.copy(alpha = 0.16f) else BrandAmber.copy(alpha = 0.18f),
+                            border = BorderStroke(1.dp, if (isPremiumActive) TintScan else BrandAmber),
+                            modifier = Modifier.testTag("home_premium_pill")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.WorkspacePremium,
+                                    contentDescription = "Premium Membership",
+                                    tint = if (isPremiumActive) TintScan else BrandCoral,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (isPremiumActive) "Premium" else "No Ads",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (isPremiumActive) TintScan else BrandCoral
+                                )
+                            }
+                        }
                         IconButton(
                             onClick = { searchOpen = !searchOpen; if (!searchOpen) searchQuery = "" },
                             modifier = Modifier.testTag("home_search_button")

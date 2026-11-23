@@ -25,9 +25,12 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Translate
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,14 +58,21 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.data.UserSettings
 import com.example.ui.theme.AccentPreset
+import com.example.ui.theme.BrandAmber
+import com.example.ui.theme.BrandCoral
 import com.example.ui.theme.LocalPaperPilotColors
 import com.example.ui.theme.ThemeMode
+import com.example.ui.theme.TintScan
+import com.example.viewmodel.MembershipUiState
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     settings: UserSettings,
+    membershipState: MembershipUiState = MembershipUiState(),
+    onOpenPremium: () -> Unit = {},
+    onWatchRewardedAd: () -> Unit = {},
     onSetThemeMode: (ThemeMode) -> Unit,
     onSetAccentPreset: (AccentPreset) -> Unit,
     onSetDefaultSaveFolder: (String) -> Unit,
@@ -88,6 +98,72 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
+        }
+
+        // Premium Membership (Google Mail Login/Sign-Up ONLY for Premium)
+        item {
+            SettingsGroup(title = "Premium Membership (Ad-Free)") {
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenPremium)
+                            .padding(16.dp)
+                            .testTag("settings_premium_card")
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if (membershipState.isPremiumActive) TintScan.copy(alpha = 0.16f)
+                                    else BrandAmber.copy(alpha = 0.18f)
+                                )
+                        ) {
+                            Icon(
+                                imageVector = if (membershipState.isPremiumActive) Icons.Rounded.Verified else Icons.Rounded.WorkspacePremium,
+                                contentDescription = "Premium Membership",
+                                tint = if (membershipState.isPremiumActive) TintScan else BrandCoral,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (membershipState.isPremiumActive) {
+                                    "Premium Active • Ad-Free"
+                                } else {
+                                    "Upgrade to Premium (Remove Ads)"
+                                },
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Text(
+                                text = when {
+                                    membershipState.isPremiumActive ->
+                                        "${membershipState.userEmail} • ${membershipState.activePlan?.priceDisplay ?: ""}/${membershipState.activePlan?.billingPeriod ?: ""}"
+                                    membershipState.isSignedIn ->
+                                        "${membershipState.userEmail} • ₹99/month or ₹999/year"
+                                    else ->
+                                        "Login / Sign up with Google Mail for ₹99/month or ₹999/year"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = extra.mutedText
+                            )
+                        }
+                        Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (!membershipState.isPremiumActive) {
+                        SettingsClickRow(
+                            icon = Icons.Rounded.PlayCircle,
+                            title = "Watch Rewarded Ad",
+                            value = "30m Ad-Free",
+                            onClick = onWatchRewardedAd
+                        )
+                    }
+                }
+            }
         }
 
         // Appearance
