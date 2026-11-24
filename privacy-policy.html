@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Privacy Policy for PaperPilot – PDF Editor by MR SOLUTION.">
+<title>PaperPilot – Privacy Policy</title>
+<style>
+:root{color-scheme:light;--ink:#17243b;--muted:#5b6678;--blue:#1769d2;--line:#e4eaf2;--bg:#f5f8fc}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:linear-gradient(120deg,#10284b,#1769d2);color:white;padding:48px 20px}header .wrap,main{max-width:880px;margin:auto}
+h1{margin:0;font-size:clamp(2rem,5vw,3rem);line-height:1.15}header p{margin:6px 0;color:#e5efff}
+main{padding:28px 18px 60px}article{background:white;border:1px solid var(--line);border-radius:16px;padding:clamp(20px,4vw,38px);box-shadow:0 8px 28px #10284b0b}
+h2{margin:30px 0 8px;font-size:1.25rem;color:#123b70}h2:first-child{margin-top:0}p{color:#344258}a{color:var(--blue);overflow-wrap:anywhere}
+.meta{font-size:.94rem}footer{text-align:center;color:var(--muted);padding:24px 16px;font-size:.9rem}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>Privacy Policy</h1><p>PaperPilot – PDF Editor</p><p>MR SOLUTION</p></div></header>
+<main><article>
+<p class="meta"><strong>Effective date:</strong> 24 November 2026<br><strong>Developer:</strong> MR SOLUTION<br><strong>Application:</strong> PaperPilot – PDF Editor<br><strong>Package name:</strong> com.aistudio.paperpilot.xkqmvn</p>
+
+<h2>1. Introduction</h2>
+<p>MR SOLUTION ("we", "us", or "our") provides PaperPilot – PDF Editor. This policy explains what information may be processed when you use the application, why it is used, and the choices available to you.</p>
+
+<h2>2. PDF documents and files</h2>
+<p>Based on the Android source code reviewed for this policy, core PDF import and document-management operations process documents locally on your device. The app copies selected files into its private application storage and maintains local document metadata in its on-device database. The reviewed Android manifest and dependencies did not establish a Firebase Storage PDF-upload flow or a server-side PDF-processing endpoint. Selecting a PDF through Android's document picker does not by itself upload that file to our servers.</p>
+<p>PDFs that you edit, export, print, or share may leave the app's private storage when you explicitly choose an export, print, or sharing destination. The privacy practices of the destination application or service then apply.</p>
+
+<h2>3. Account and sign-in information</h2>
+<p>PaperPilot uses Google Sign-In with Firebase Authentication for account access. Depending on the sign-in flow, account information may include your name, email address, profile information, and a unique account identifier. We use this information to authenticate users and provide account-related features.</p>
+
+<h2>4. Firebase and membership information</h2>
+<p>The reviewed project uses Firebase Authentication and Cloud Firestore for account and membership-related functionality. Firestore records may include a user identifier, email address, display name, membership tier and status, payment provider, transaction reference, and timestamps. Payment and membership records are used to manage entitlements, verify transactions, and support the service.</p>
+<p>Firebase privacy information: <a href="https://firebase.google.com/support/privacy" rel="noopener">Firebase Privacy and Security</a>.</p>
+
+<h2>5. Payments and subscriptions</h2>
+<p>The Android project includes Google Play Billing and Razorpay integrations. Where a payment method is enabled, the relevant payment provider processes payment information under its own terms and privacy policy. PaperPilot's backend or database may receive transaction references, plan details, payment status, and subscription dates to verify and manage membership. Do not send card PINs, banking passwords, or one-time passwords to our support team.</p>
+<p>Razorpay privacy information: <a href="https://razorpay.com/privacy/" rel="noopener">Razorpay Privacy Policy</a>. Google privacy information: <a href="https://policies.google.com/privacy" rel="noopener">Google Privacy Policy</a>.</p>
+
+<h2>6. Advertising</h2>
+<p>The project includes Google Mobile Ads (AdMob) SDK integration, and the app initializes the ads SDK and calls ad-loading/display functions. The Android manifest currently declares Google's official test AdMob application ID. Production advertising configuration must be checked for the released APK. When ads are enabled, Google may process device, app, network, advertising identifier (where available and permitted), and ad interaction information to deliver, measure, and protect advertising.</p>
+<p>Google privacy information: <a href="https://policies.google.com/privacy" rel="noopener">Google Privacy Policy</a>.</p>
+
+<h2>7. Permissions</h2>
+<p>The Android manifest declares camera permission for document scanning and internet/network-state permissions for online features. Users select documents through Android's document-picker interface. Permissions are used to provide the related application features. You can review or change app permissions in Android settings.</p>
+
+<h2>8. Sharing and service providers</h2>
+<p>We do not sell personal information. Information may be processed by providers supporting authentication, database hosting, payments, advertising, diagnostics, or app operation. We may disclose information when required by law or reasonably necessary to protect users, the application, or our rights.</p>
+
+<h2>9. Data retention</h2>
+<p>Account, membership, and transaction-related information may be retained while needed to operate the service, resolve disputes, maintain security, and meet legal or accounting obligations. The precise retention period depends on the deployed Firebase and payment-provider configuration.</p>
+<p>Core PDF documents, thumbnails, scans, and signatures are maintained in the app's private device storage and local database. The app provides document deletion controls, including permanent deletion from its local document store. Files exported or shared to other destinations may remain there until separately deleted by the user.</p>
+
+<h2>10. Security</h2>
+<p>We use reasonable technical and organizational safeguards appropriate to the information we process. No storage system or internet transmission can be guaranteed to be completely secure.</p>
+
+<h2>11. Account deletion</h2>
+<p>Important implementation limitation: the Firestore rules reviewed allow a signed-in user to delete their own Firestore user profile document, but that rule alone does not delete the user's Firebase Authentication account or related membership, payment, order, or refund records. The production account-deletion flow must be verified and should address Authentication and related records, subject to legal retention duties. This policy does not promise automatic deletion of all account-associated data until that flow is implemented and tested.</p>
+<p>Deleting an account does not delete PDF files already exported or shared to other apps or storage destinations. Core local documents can be removed using the app's document deletion controls or by clearing/uninstalling the app, subject to Android backup and device settings.</p>
+
+<h2>12. Children's privacy</h2>
+<p>PaperPilot is not intended to knowingly collect personal information from children in violation of applicable law. If you believe a child has provided personal information improperly, contact us so we can review the request.</p>
+
+<h2>13. Your choices and rights</h2>
+<p>Depending on applicable law, you may have rights to request access to, correction of, or deletion of personal information, or to raise a privacy complaint. You may manage Android permissions and Google account permissions through your device or Google account settings.</p>
+
+<h2>14. Changes to this policy</h2>
+<p>We may update this policy when the app, its integrations, or legal requirements change. The latest version will be published at this webpage with an updated effective date.</p>
+
+<h2>15. Contact</h2>
+<p><strong>MR SOLUTION</strong><br>PaperPilot – PDF Editor<br>Email: <a href="mailto:YOUR_SUPPORT_EMAIL">YOUR_SUPPORT_EMAIL</a></p>
+</article></main>
+<footer>© 2026 MR SOLUTION. All rights reserved.</footer>
+</body>
+</html>
