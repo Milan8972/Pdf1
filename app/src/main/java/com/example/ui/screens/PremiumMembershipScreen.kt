@@ -211,7 +211,7 @@ fun PremiumMembershipScreen(
             return
         }
         scope.launch {
-            val user = Firebase.auth.currentUser
+            val user = runCatching { Firebase.auth.currentUser }.getOrNull()
             val idToken = runCatching { user?.getIdToken(false)?.await()?.token.orEmpty() }.getOrDefault("")
             if (user == null || idToken.isBlank()) {
                 onNotify("Please sign in with Google Mail to initiate payment.")
@@ -258,7 +258,7 @@ fun PremiumMembershipScreen(
             return
         }
         scope.launch {
-            val user = Firebase.auth.currentUser
+            val user = runCatching { Firebase.auth.currentUser }.getOrNull()
             val idToken = runCatching { user?.getIdToken(false)?.await()?.token.orEmpty() }.getOrDefault("")
             if (user == null || idToken.isBlank()) {
                 onNotify("Please sign in with Google Mail to start your ₹1 trial.")

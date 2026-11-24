@@ -126,11 +126,11 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     private val db = PaperPilotDatabase.getInstance(application)
     val repository = DocumentRepository(application, db)
     val settingsStore = SettingsStore(application)
-    private val membershipRepository = FirebaseMembershipRepository(application)
+    private val membershipRepository: FirebaseMembershipRepository? = runCatching { FirebaseMembershipRepository(application) }.getOrNull()
     private val paymentBackendClient = PaymentBackendClient()
     private val paymentManager = PaymentManager(application)
     private val playBillingManager = GooglePlayBillingManager(application)
-    private val firebaseAuth: FirebaseAuth = Firebase.auth
+    private val firebaseAuth: FirebaseAuth? = runCatching { Firebase.auth }.getOrNull()
 
     private val _membershipState = MutableStateFlow(MembershipUiState())
     val membershipState: StateFlow<MembershipUiState> = _membershipState.asStateFlow()
@@ -203,12 +203,14 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
                 }
             }
         }
-        val listener = FirebaseAuth.AuthStateListener { auth ->
-            syncAuthAndMembership(auth)
+        firebaseAuth?.let { authInstance ->
+            val listener = FirebaseAuth.AuthStateListener { auth ->
+                syncAuthAndMembership(auth)
+            }
+            authStateListener = listener
+            authInstance.addAuthStateListener(listener)
+            syncAuthAndMembership(authInstance)
         }
-        authStateListener = listener
-        firebaseAuth.addAuthStateListener(listener)
-        syncAuthAndMembership(firebaseAuth)
 
         // Initialize Google Play Billing v7 and observe live store prices + purchase updates
         playBillingManager.connect()
@@ -246,7 +248,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     override fun onCleared() {
         super.onCleared()
         clearMembershipListenerBeforeSignOut()
-        authStateListener?.let { firebaseAuth.removeAuthStateListener(it) }
+        authStateListener?.let { firebaseAuth?.removeAuthStateListener(it) }
         playBillingManager.endConnection()
     }
 
@@ -271,13 +273,15 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
             errorMessage = null
         )
 
+        val repo = membershipRepository ?: return
+
         viewModelScope.launch {
-            val admin = membershipRepository.checkIsAdmin(uid, email)
+            val admin = repo.checkIsAdmin(uid, email)
             _membershipState.value = _membershipState.value.copy(isAdmin = admin)
         }
 
         membershipObserverJob = viewModelScope.launch {
-            membershipRepository.observeMembership(uid)
+            repo.observeMembership(uid)
                 .catch { error ->
                     val firestoreError = generateSequence(error) { it.cause }
                         .filterIsInstance<FirebaseFirestoreException>()
@@ -317,13 +321,13 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
         }
 
         paymentsObserverJob = viewModelScope.launch {
-            membershipRepository.observeUserPayments(uid).collect { txList ->
+            repo.observeUserPayments(uid).collect { txList ->
                 _membershipState.value = _membershipState.value.copy(transactions = txList)
             }
         }
 
         refundsObserverJob = viewModelScope.launch {
-            membershipRepository.observeUserRefunds(uid).collect { refundList ->
+            repo.observeUserRefunds(uid).collect { refundList ->
                 _membershipState.value = _membershipState.value.copy(refunds = refundList)
             }
         }
@@ -332,13 +336,14 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun onGoogleAuthSucceeded() {
-        val user = firebaseAuth.currentUser ?: return
-        syncAuthAndMembership(firebaseAuth)
+        val authInstance = firebaseAuth ?: return
+        val user = authInstance.currentUser ?: return
+        syncAuthAndMembership(authInstance)
         viewModelScope.launch {
-            membershipRepository.ensureUserProfile(
+            membershipRepository?.ensureUserProfile(
                 email = user.email.orEmpty(),
                 displayName = user.displayName.orEmpty()
-            ).onFailure { err ->
+            )?.onFailure { err ->
                 _membershipState.value = _membershipState.value.copy(
                     errorMessage = err.localizedMessage ?: "Failed to sync Google account."
                 )
@@ -412,7 +417,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
         targetPlan: MembershipPlan = _paymentFlowState.value.autoPayTargetPlan,
         customPaymentManager: PaymentManager? = null
     ) {
-        val user = firebaseAuth.currentUser
+        val user = firebaseAuth?.currentUser
         if (user == null) {
             emitMessage("Please sign in with Google Mail to start the ₹1 1-day trial.")
             return
@@ -473,7 +478,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
      * remaining paid or 24-hour trial access.
      */
     fun toggleAutoPay(enabled: Boolean, reason: String = "User updated AutoPay preference") {
-        val user = firebaseAuth.currentUser
+        val user = firebaseAuth?.currentUser
         if (user == null) {
             emitMessage("Sign in with Google Mail to manage AutoPay.")
             return
@@ -515,7 +520,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
         activity: Activity?,
         customPaymentManager: PaymentManager? = null
     ) {
-        val user = firebaseAuth.currentUser
+        val user = firebaseAuth?.currentUser
         if (user == null) {
             emitMessage("Please sign in with Google Mail before purchasing Premium.")
             return
@@ -593,7 +598,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun handleRazorpayCheckoutEvent(event: RazorpayCheckoutEvent) {
-        val user = firebaseAuth.currentUser
+        val user = firebaseAuth?.currentUser
         when (event) {
             is RazorpayCheckoutEvent.PaymentCapturedPendingVerification -> {
                 if (user == null) {
@@ -662,7 +667,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun refreshMembershipStatusFromServer() {
-        val user = firebaseAuth.currentUser ?: return
+        val user = firebaseAuth?.currentUser ?: return
         if (!paymentBackendClient.isConfigured()) return
         viewModelScope.launch {
             val idToken = runCatching { user.getIdToken(false).await().token.orEmpty() }.getOrDefault("")
@@ -694,7 +699,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     private fun handlePlayBillingEvent(event: PlayBillingEvent) {
         when (event) {
             is PlayBillingEvent.PurchaseReadyForServerVerification -> {
-                val user = firebaseAuth.currentUser
+                val user = firebaseAuth?.currentUser
                 if (user == null) {
                     failPayment("Sign-In Required", "Sign in with Google Mail to verify your Play purchase.")
                     return
@@ -748,7 +753,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun restorePurchases() {
-        val user = firebaseAuth.currentUser
+        val user = firebaseAuth?.currentUser
         if (user == null) {
             emitMessage("Sign in with Google Mail to restore your purchases.")
             return
@@ -797,7 +802,7 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun cancelPremiumSubscription(reason: String) {
-        val user = firebaseAuth.currentUser
+        val user = firebaseAuth?.currentUser
         if (user == null) {
             emitMessage("Sign in with Google Mail to manage your subscription.")
             return
@@ -824,9 +829,10 @@ class PaperPilotViewModel(application: Application) : AndroidViewModel(applicati
 
     fun refreshAdminDashboard() {
         if (!_membershipState.value.isAdmin) return
+        val repo = membershipRepository ?: return
         viewModelScope.launch {
             _membershipState.value = _membershipState.value.copy(isLoadingAdmin = true, adminError = null)
-            membershipRepository.loadAdminDashboardSnapshot()
+            repo.loadAdminDashboardSnapshot()
                 .onSuccess { snapshot ->
                     _membershipState.value = _membershipState.value.copy(
                         adminMetrics = snapshot,

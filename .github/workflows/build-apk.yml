@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java 21 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -109,7 +109,24 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
+      - name: Prepare optional Firebase google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "app/google-services.json" ] && [ -s "app/google-services.json" ]; then
+            echo "Found app/google-services.json in repository."
+          elif [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+            printf '%s' "${GOOGLE_SERVICES_JSON_BASE64}" | base64 -d > app/google-services.json
+            echo "Restored app/google-services.json from GitHub Secrets."
+          else
+            echo "::notice::app/google-services.json not present and GOOGLE_SERVICES_JSON_BASE64 secret not set. Building offline-capable APK/AAB without Firebase config."
+          fi
+
       - name: Prepare debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
         shell: bash
         run: |
           set -euo pipefail
@@ -124,6 +141,9 @@ jobs:
 
           if [ -f "${KEYSTORE_PATH}" ] && [ -s "${KEYSTORE_PATH}" ]; then
             echo "Existing debug keystore detected; skipping generation."
+          elif [ -n "${DEBUG_KEYSTORE_BASE64:-}" ]; then
+            echo "Decoding DEBUG_KEYSTORE_BASE64 from GitHub Secrets..."
+            printf '%s' "${DEBUG_KEYSTORE_BASE64}" | base64 -d > "${KEYSTORE_PATH}"
           elif [ -f "${KEYSTORE_B64}" ] && [ -s "${KEYSTORE_B64}" ]; then
             echo "Decoding committed debug.keystore.base64 for Firebase SHA-1 parity..."
             base64 -d "${KEYSTORE_B64}" > "${KEYSTORE_PATH}"
@@ -153,7 +173,13 @@ jobs:
       - name: Build debug APK
         shell: bash
         run: |
-          gradle :app:assembleDebug \
+          set -euo pipefail
+          GRADLE_CMD="gradle"
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            GRADLE_CMD="./gradlew"
+          fi
+          "${GRADLE_CMD}" :app:assembleDebug \
             --no-daemon \
             --no-configuration-cache \
             --max-workers=2 \
@@ -215,7 +241,13 @@ jobs:
       - name: Build debug AAB
         shell: bash
         run: |
-          gradle :app:bundleDebug \
+          set -euo pipefail
+          GRADLE_CMD="gradle"
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            GRADLE_CMD="./gradlew"
+          fi
+          "${GRADLE_CMD}" :app:bundleDebug \
             --no-daemon \
             --no-configuration-cache \
             --max-workers=2 \
