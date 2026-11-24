@@ -18,11 +18,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 17 (Temurin)
+      - name: Set up Java 21 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Verify Java environment
         shell: bash
@@ -54,31 +54,81 @@ jobs:
           fi
 
           echo "Detected Java major version: ${MAJOR_VERSION}"
-          if [ "${MAJOR_VERSION}" -lt 17 ]; then
-            echo "::error::Java 17 or newer is required, but detected Java ${MAJOR_VERSION} (${RAW_VERSION})."
+          if [ "${MAJOR_VERSION}" -lt 21 ]; then
+            echo "::error::Java 21 or newer is required for Gradle 9.3.1 / AGP 9.1.1, but detected Java ${MAJOR_VERSION} (${RAW_VERSION})."
             exit 1
           fi
+
+      - name: Set up Android SDK (API 36.1 & Build Tools 36.0.0)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          if [ ! -d "${SDK_DIR}" ]; then
+            echo "::error::Android SDK directory not found at ${SDK_DIR}."
+            exit 1
+          fi
+
+          echo "ANDROID_HOME=${SDK_DIR}" >> "${GITHUB_ENV}"
+          echo "ANDROID_SDK_ROOT=${SDK_DIR}" >> "${GITHUB_ENV}"
+
+          SDKMANAGER_BIN=""
+          for candidate in \
+            "${SDK_DIR}/cmdline-tools/latest/bin/sdkmanager" \
+            "${SDK_DIR}"/cmdline-tools/*/bin/sdkmanager \
+            "${SDK_DIR}/tools/bin/sdkmanager"; do
+            if [ -x "${candidate}" ]; then
+              SDKMANAGER_BIN="${candidate}"
+              break
+            fi
+          done
+
+          if [ -z "${SDKMANAGER_BIN}" ]; then
+            echo "::error::sdkmanager binary not found under ${SDK_DIR}."
+            exit 1
+          fi
+
+          echo "Using sdkmanager: ${SDKMANAGER_BIN}"
+          set +o pipefail
+          yes | "${SDKMANAGER_BIN}" --sdk_root="${SDK_DIR}" --licenses >/dev/null 2>&1 || true
+          set -o pipefail
+
+          "${SDKMANAGER_BIN}" --sdk_root="${SDK_DIR}" --install \
+            "platform-tools" \
+            "build-tools;36.0.0" \
+            "platforms;android-36" \
+            "platforms;android-36.1"
+
+          echo "Installed Android platforms:"
+          ls -1 "${SDK_DIR}/platforms" || true
+          echo "Installed Android build-tools:"
+          ls -1 "${SDK_DIR}/build-tools" || true
 
       - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.3.1"
 
-      - name: Create temporary debug keystore
+      - name: Prepare debug keystore
         shell: bash
         run: |
           set -euo pipefail
           KEYSTORE_PATH="./debug.keystore"
+          KEYSTORE_B64="./debug.keystore.base64"
           KEYTOOL_BIN="${JAVA_HOME}/bin/keytool"
 
           if [ ! -x "${KEYTOOL_BIN}" ]; then
-            echo "::error::keytool was not found in the configured Java 17 installation (${JAVA_HOME})."
+            echo "::error::keytool was not found in the configured Java 21 installation (${JAVA_HOME})."
             exit 1
           fi
 
-          if [ -f "${KEYSTORE_PATH}" ]; then
+          if [ -f "${KEYSTORE_PATH}" ] && [ -s "${KEYSTORE_PATH}" ]; then
             echo "Existing debug keystore detected; skipping generation."
+          elif [ -f "${KEYSTORE_B64}" ] && [ -s "${KEYSTORE_B64}" ]; then
+            echo "Decoding committed debug.keystore.base64 for Firebase SHA-1 parity..."
+            base64 -d "${KEYSTORE_B64}" > "${KEYSTORE_PATH}"
           else
+            echo "Generating temporary debug keystore..."
             if ! "${KEYTOOL_BIN}" -genkeypair \
               -keystore "${KEYSTORE_PATH}" \
               -storepass android \
@@ -94,15 +144,22 @@ jobs:
           fi
 
           if [ ! -f "${KEYSTORE_PATH}" ] || [ ! -s "${KEYSTORE_PATH}" ]; then
-            echo "::error::Temporary debug keystore is missing or empty after generation."
+            echo "::error::Debug keystore is missing or empty after preparation."
             exit 1
           fi
 
-          echo "Temporary debug keystore is ready."
+          echo "Debug keystore is ready."
 
       - name: Build debug APK
         shell: bash
-        run: gradle :app:assembleDebug --stacktrace --no-daemon
+        run: |
+          gradle :app:assembleDebug \
+            --no-daemon \
+            --no-configuration-cache \
+            --max-workers=2 \
+            --console=plain \
+            --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
 
       - name: Verify debug APK
         id: verify_apk
@@ -157,7 +214,14 @@ jobs:
 
       - name: Build debug AAB
         shell: bash
-        run: gradle :app:bundleDebug --stacktrace --no-daemon
+        run: |
+          gradle :app:bundleDebug \
+            --no-daemon \
+            --no-configuration-cache \
+            --max-workers=2 \
+            --console=plain \
+            --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
 
       - name: Verify debug AAB
         id: verify_aab
